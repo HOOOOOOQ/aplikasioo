@@ -90,19 +90,19 @@ jobs:
             const fs = require('fs');
             let log = '';
             try { log = fs.readFileSync('build-apk.log', 'utf8'); } catch(e) { log = 'no log file ' + e; }
-            // Cari error Dart/Flutter sebelum What went wrong (mis: Target kernel_snapshot failed / Error: )
             let dartErr = '';
-            const markers = ['Failed to compile','kernel_snapshot','Error:','error:','Target '];
-            for (const m of markers) {
-              const i = log.indexOf(m);
-              if (i >= 0) { dartErr = log.slice(Math.max(0,i-2000), i+4000); break; }
+            const wIdx = log.indexOf('* What went wrong');
+            if (wIdx >= 0) {
+              // 12k sebelum What went wrong biasanya berisi error Flutter/Dart
+              dartErr = log.slice(Math.max(0, wIdx-12000), wIdx);
+            } else {
+              dartErr = log.slice(-12000);
             }
             let snippet = '';
-            const wIdx = log.indexOf('* What went wrong');
             if (wIdx >= 0) snippet = log.slice(wIdx, wIdx + 4000);
             const tail = log.slice(-5000);
             const parts = [];
-            if (dartErr) parts.push('---DART ERROR---\n' + dartErr);
+            if (dartErr) parts.push('---DART/FLUTTER LOG (12k sebelum What went wrong)---\n' + dartErr);
             if (snippet) parts.push('---GRADLE What went wrong---\n' + snippet);
             parts.push('---TAIL---\n' + tail);
             const combined = parts.join('\n\n');
@@ -119,11 +119,9 @@ jobs:
       - name: Append log to job summary (always)
         if: always()
         run: |
-          echo "### Build log — Dart error + What went wrong + tail" >> $GITHUB_STEP_SUMMARY
+          echo "### Build log — 12k sebelum What went wrong + tail" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          grep -m1 -B5 -A20 "Failed to compile\|kernel_snapshot\|Error:" build-apk.log | head -80 >> $GITHUB_STEP_SUMMARY || echo "no dart error found" >> $GITHUB_STEP_SUMMARY
-          echo "---What went wrong---" >> $GITHUB_STEP_SUMMARY
-          grep -A 30 "What went wrong" build-apk.log >> $GITHUB_STEP_SUMMARY || true
+          awk '/* What went wrong/{p=NR} NR>p-200 && NR<=p' build-apk.log | tail -c 6000 >> $GITHUB_STEP_SUMMARY || grep -A 30 "What went wrong" build-apk.log >> $GITHUB_STEP_SUMMARY || true
           echo "---TAIL---" >> $GITHUB_STEP_SUMMARY
           tail -c 4000 build-apk.log >> $GITHUB_STEP_SUMMARY || echo "no log" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
