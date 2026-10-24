@@ -100,3 +100,7 @@ supabase/.temp/
 # Local Supabase
 .branches
 .temp
+
+# EduTask local config (jangan commit key asli)
+lib/core/config/supabase_local.dart
+.vscode/launch.json
