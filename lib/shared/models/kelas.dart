@@ -22,15 +22,21 @@ class Kelas extends Equatable {
   });
 
   factory Kelas.fromJson(Map<String, dynamic> json) {
+    DateTime parseDt(dynamic v) {
+      try {
+        if (v == null) return DateTime.now();
+        return DateTime.parse(v as String);
+      } catch (_) { return DateTime.now(); }
+    }
     return Kelas(
-      id: json['id'] as String,
-      namaKelas: json['nama_kelas'] as String,
+      id: json['id'] as String? ?? '',
+      namaKelas: json['nama_kelas'] as String? ?? '-',
       tingkat: json['tingkat'] as String?,
       tahunAjaran: json['tahun_ajaran'] as String?,
       waliKelasId: json['wali_kelas_id'] as String?,
       waliKelasNama: json['wali_kelas_nama'] as String? ?? (json['profiles'] != null ? (json['profiles'] as Map)['full_name'] as String? : null),
       jumlahSiswa: json['jumlah_siswa'] as int? ?? 0,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: parseDt(json['created_at']),
     );
   }
 

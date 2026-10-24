@@ -15,15 +15,24 @@ class AppDateUtils {
   static tz.Location get jakarta => tz.getLocation('Asia/Jakarta');
 
   static DateTime nowJakarta() {
-    initTimezone();
-    return tz.TZDateTime.now(jakarta);
+    try {
+      initTimezone();
+      return tz.TZDateTime.now(jakarta);
+    } catch (_) {
+      return DateTime.now();
+    }
   }
 
   static DateTime toJakarta(DateTime dt) {
-    initTimezone();
-    // Simpan di DB sebagai UTC; tampilkan sebagai Jakarta
-    final utc = dt.isUtc ? dt : dt.toUtc();
-    return tz.TZDateTime.from(utc, jakarta);
+    try {
+      initTimezone();
+      // Simpan di DB sebagai UTC; tampilkan sebagai Jakarta
+      final utc = dt.isUtc ? dt : dt.toUtc();
+      return tz.TZDateTime.from(utc, jakarta);
+    } catch (_) {
+      // Fallback kalau tz belum siap
+      return dt.toLocal();
+    }
   }
 
   static String formatTanggal(DateTime? dt, {String pattern = 'dd MMMM yyyy'}) {
@@ -44,17 +53,20 @@ class AppDateUtils {
     return DateFormat('HH:mm', 'id_ID').format(jkt);
   }
 
-  static String formatJamFromString(String? timeStr) {
-    if (timeStr == null || timeStr.isEmpty) return '-';
-    // Expect HH:mm:ss or HH:mm
+  static String? tryFormatJamFromString(String? timeStr) {
+    if (timeStr == null || timeStr.isEmpty) return null;
     try {
       final parts = timeStr.split(':');
-      final h = int.parse(parts[0]);
-      final m = int.parse(parts[1]);
+      final h = int.tryParse(parts[0]) ?? 0;
+      final m = int.tryParse(parts[1]) ?? 0;
       return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
     } catch (_) {
-      return timeStr;
+      return null;
     }
+  }
+
+  static String formatJamFromString(String? timeStr) {
+    return tryFormatJamFromString(timeStr) ?? '-';
   }
 
   static String relativeDeadline(DateTime? deadline) {
