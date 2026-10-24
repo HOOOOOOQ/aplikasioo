@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/widgets/app_banner.dart';
 import '../../../auth/domain/app_user.dart';
 import '../../../auth/presentation/auth_provider.dart';
 
@@ -30,7 +31,7 @@ class AdminShell extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('EduTask Admin'),
+        title: const EduTaskHeaderBanner(isAppBar: true),
         backgroundColor: AppColors.primary,
         actions: [
           if (user != null)
@@ -51,13 +52,30 @@ class AdminShell extends ConsumerWidget {
         child: Column(
           children: [
             DrawerHeader(
-              decoration: const BoxDecoration(color: AppColors.primary),
+              decoration: const BoxDecoration(gradient: AppColors.headerGradient),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.school, color: Colors.white, size: 40),
-                  const SizedBox(height: 8),
-                  const Text('EduTask', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
+                        clipBehavior: Clip.antiAlias,
+                        child: Image.asset('assets/images/edutask_logo.png', fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.school, color: AppColors.primary)),
+                      ),
+                      const SizedBox(width: 10),
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('EduTask', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                          Text('Tugas & Jadwal', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
                   Text(user?.email ?? '-', style: const TextStyle(color: Colors.white70, fontSize: 12)),
                   const SizedBox(height: 4),
                   Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(6)), child: Text(user?.role.label ?? 'Admin', style: const TextStyle(color: Colors.white, fontSize: 11))),

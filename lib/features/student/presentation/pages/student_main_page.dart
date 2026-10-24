@@ -6,6 +6,7 @@ import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/date_utils.dart';
 import '../../../../core/utils/deadline_helper.dart';
+import '../../../../core/widgets/app_banner.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/widgets/loading_view.dart';
 import '../../../../core/widgets/status_chip.dart';
@@ -72,24 +73,7 @@ class _StudentMainPageState extends ConsumerState<StudentMainPage> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.primary,
-        title: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-              child: const Icon(Icons.school, color: AppColors.primary, size: 20),
-            ),
-            const SizedBox(width: 10),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('EduTask', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                Text('Tugas & Jadwal Sekolah', style: TextStyle(fontSize: 11, color: Colors.white70)),
-              ],
-            ),
-          ],
-        ),
+        title: const EduTaskHeaderBanner(isAppBar: true),
         actions: [
           IconButton(icon: const Icon(Icons.person_outline, color: Colors.white), onPressed: () => context.push('/siswa/identitas')),
           IconButton(icon: const Icon(Icons.login, color: Colors.white), onPressed: () => context.push('/login')),
@@ -120,6 +104,9 @@ class _StudentMainPageState extends ConsumerState<StudentMainPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Banner EduTask — selalu tampil agar branding jelas
+                const EduTaskBanner(height: 42),
+                const SizedBox(height: 12),
                 // Tanggal hari ini
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -226,10 +213,11 @@ class _StudentMainPageState extends ConsumerState<StudentMainPage> {
 
   Widget _buildNotConfigured() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          const SizedBox(height: 20),
+          const EduTaskBanner(height: 44),
+          const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(color: AppColors.warningContainer, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.warning)),
@@ -240,7 +228,7 @@ class _StudentMainPageState extends ConsumerState<StudentMainPage> {
                 Text('Supabase Belum Dikonfigurasi', style: TextStyle(fontWeight: FontWeight.w600)),
                 SizedBox(height: 8),
                 Text(
-                  'Aplikasi belum terhubung ke database online. Admin perlu mengatur SUPABASE_URL dan SUPABASE_ANON_KEY melalui --dart-define.\n\nLihat README.md untuk panduan.',
+                  'Aplikasi belum terhubung ke database online. Admin perlu mengatur SUPABASE_URL dan SUPABASE_ANON_KEY melalui --dart-define.\n\nLihat README.md untuk panduan. Kamu tetap bisa lihat preview fitur di bawah.',
                   style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
                   textAlign: TextAlign.center,
                 ),

@@ -3,15 +3,13 @@ import '../../shared/services/supabase_service.dart';
 import '../models/siswa.dart';
 
 class SiswaRepository {
-  final SupabaseClient _c = SupabaseService.client;
+  SupabaseClient get _c => SupabaseService.client;
 
   Future<List<Siswa>> fetchAll({String? kelasId, String? search}) async {
     var query = _c.from('siswa').select('*, kelas(nama_kelas)');
     if (kelasId != null && kelasId.isNotEmpty) query = query.eq('kelas_id', kelasId);
     final data = await query.order('nama');
     var list = (data as List).map((e) => Siswa.fromJson(e as Map<String, dynamic>)).toList();
-    // fallback manually for kelasNama mapping
-    // Actually via fromJson
     if (search != null && search.trim().isNotEmpty) {
       final s = search.toLowerCase();
       list = list.where((e) => e.nama.toLowerCase().contains(s) || e.nomorInduk.toLowerCase().contains(s)).toList();

@@ -6,7 +6,7 @@ import '../models/tugas.dart';
 import '../models/status_tugas.dart';
 
 class TugasRepository {
-  final SupabaseClient _c = SupabaseService.client;
+  SupabaseClient get _c => SupabaseService.client;
 
   Future<List<Tugas>> fetchAll({String? kelasId, String? guruId, String? mapelId, String? search, String? siswaId}) async {
     var q = _c.from('tugas').select('*, kelas(nama_kelas), mata_pelajaran(nama_mapel), profiles!tugas_guru_id_fkey(full_name)');
@@ -17,7 +17,6 @@ class TugasRepository {
     final data = await q.order('tenggat_waktu', ascending: true);
     var list = (data as List).map((e) => Tugas.fromJson(e as Map<String, dynamic>)).toList();
 
-    // If siswaId provided, fetch status_tugas_siswa for those
     if (siswaId != null && list.isNotEmpty) {
       final ids = list.map((e) => e.id).toList();
       final statusData = await _c.from('status_tugas_siswa').select().inFilter('tugas_id', ids).eq('siswa_id', siswaId);
@@ -117,7 +116,6 @@ class TugasRepository {
     return {'total': total, 'selesai': selesai, 'belum': total - selesai};
   }
 
-  // Secure student status update via Edge Function or direct with token
   Future<void> updateStudentStatusViaFunction({required String tugasId, required String siswaId, required String status, required String token}) async {
     try {
       await _c.functions.invoke('update-student-task-status', body: {
@@ -127,7 +125,6 @@ class TugasRepository {
         'token': token,
       });
     } catch (e) {
-      // fallback direct if RLS allows with token policy
       await _c.from('status_tugas_siswa').upsert({
         'tugas_id': tugasId,
         'siswa_id': siswaId,

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/config/supabase_config.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/validators.dart';
+import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import 'auth_provider.dart';
 import '../../auth/domain/app_user.dart';
@@ -79,24 +80,17 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 40),
-              // Logo EduTask
-              Center(
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    gradient: AppColors.primaryGradient,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 16, offset: const Offset(0, 8))],
-                  ),
-                  child: const Icon(Icons.school_rounded, size: 40, color: Colors.white),
-                ),
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
+              // Banner Logo EduTask — utama biar tidak FC, pakai errorBuilder
+              Center(child: EduTaskLogo(size: 88)),
+              const SizedBox(height: 14),
               const Center(child: Text('EduTask', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.primary))),
               const Center(child: Text('Aplikasi Tugas & Jadwal Sekolah', style: TextStyle(fontSize: 14, color: AppColors.textSecondary))),
-              const SizedBox(height: 32),
+              const SizedBox(height: 6),
+              const Center(
+                child: EduTaskBanner(height: 42),
+              ),
+              const SizedBox(height: 20),
               if (SupabaseConfig.isNotConfigured)
                 Container(
                   padding: const EdgeInsets.all(12),

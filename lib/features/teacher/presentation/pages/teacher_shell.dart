@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/widgets/app_banner.dart';
 import '../../../auth/presentation/auth_provider.dart';
 
 class TeacherShell extends ConsumerWidget {
@@ -24,7 +25,7 @@ class TeacherShell extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('EduTask Guru'),
+        title: const EduTaskHeaderBanner(isAppBar: true),
         backgroundColor: AppColors.primary,
         actions: [
           if (user != null) Padding(padding: const EdgeInsets.only(right: 8), child: Center(child: Text(user.fullName, style: const TextStyle(color: Colors.white, fontSize: 12)))),
@@ -35,11 +36,28 @@ class TeacherShell extends ConsumerWidget {
         child: Column(
           children: [
             DrawerHeader(
-              decoration: const BoxDecoration(color: AppColors.primary),
+              decoration: const BoxDecoration(gradient: AppColors.headerGradient),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Icon(Icons.school, color: Colors.white, size: 40),
-                const SizedBox(height: 8),
-                const Text('EduTask Guru', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
+                      clipBehavior: Clip.antiAlias,
+                      child: Image.asset('assets/images/edutask_logo.png', fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.school, color: AppColors.primary)),
+                    ),
+                    const SizedBox(width: 10),
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('EduTask Guru', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                        Text('Tugas & Jadwal', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
                 Text(user?.email ?? '-', style: const TextStyle(color: Colors.white70, fontSize: 12)),
               ]),
             ),

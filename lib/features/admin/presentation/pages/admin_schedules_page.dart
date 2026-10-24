@@ -49,7 +49,9 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
   Future<void> _showForm({Jadwal? existing}) async {
     final kelasList = await KelasRepository().fetchAll();
     final mapelList = await MapelRepository().fetchAll();
-    final guruData = await SupabaseService.client.from('profiles').select('id, full_name').eq('role', 'guru');
+    final tryC = SupabaseService.tryClient;
+    if (tryC == null) throw Exception('Supabase belum siap');
+    final guruData = await tryC.from('profiles').select('id, full_name').eq('role', 'guru');
     final gurus = (guruData as List).cast<Map<String, dynamic>>();
 
     String? kelasId = existing?.kelasId ?? kelasList.firstOrNull?.id;

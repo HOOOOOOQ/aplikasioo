@@ -104,7 +104,8 @@ class _TeacherTaskFormPageState extends State<TeacherTaskFormPage> {
       if (_lampiranBytes != null && _lampiranName != null) {
         lampiranPath = await TugasRepository().uploadLampiran(fileName: _lampiranName!, bytes: _lampiranBytes!);
       }
-      final guruId = SupabaseService.client.auth.currentUser!.id;
+      final guruId = SupabaseService.tryClient?.auth.currentUser?.id;
+      if (guruId == null) throw Exception('Belum login — silakan login ulang');
       final payload = {
         'judul': _judulC.text.trim(),
         'deskripsi': _deskripsiC.text.trim(),
