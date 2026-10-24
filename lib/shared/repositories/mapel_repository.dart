@@ -3,7 +3,7 @@ import '../services/supabase_service.dart';
 import '../models/mata_pelajaran.dart';
 
 class MapelRepository {
-  final SupabaseClient _c = SupabaseService.client;
+  SupabaseClient get _c => SupabaseService.client;
 
   Future<List<MataPelajaran>> fetchAll() async {
     final data = await _c.from('mata_pelajaran').select().order('nama_mapel');

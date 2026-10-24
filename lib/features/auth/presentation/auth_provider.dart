@@ -1,20 +1,33 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/config/supabase_config.dart';
 import '../data/auth_repository.dart';
 import '../domain/app_user.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) => AuthRepository());
 
 final authStateProvider = StreamProvider<AuthState>((ref) {
+  if (SupabaseConfig.isNotConfigured) return const Stream.empty();
   final repo = ref.watch(authRepositoryProvider);
-  return repo.authStateChanges();
+  try {
+    return repo.authStateChanges();
+  } catch (_) {
+    return const Stream.empty();
+  }
 });
 
 final currentUserProvider = FutureProvider<AppUser?>((ref) async {
+  if (SupabaseConfig.isNotConfigured) return null;
   final repo = ref.watch(authRepositoryProvider);
-  // depend on auth state to auto-refresh
-  ref.watch(authStateProvider);
-  return repo.getCurrentProfile();
+  // depend on auth state to auto-refresh — guard agar tidak crash
+  try {
+    ref.watch(authStateProvider);
+  } catch (_) {}
+  try {
+    return await repo.getCurrentProfile();
+  } catch (_) {
+    return null;
+  }
 });
 
 // Sync provider for quick access

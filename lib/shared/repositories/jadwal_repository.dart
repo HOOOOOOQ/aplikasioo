@@ -3,7 +3,7 @@ import '../services/supabase_service.dart';
 import '../models/jadwal.dart';
 
 class JadwalRepository {
-  final SupabaseClient _c = SupabaseService.client;
+  SupabaseClient get _c => SupabaseService.client;
 
   Future<List<Jadwal>> fetchAll({String? kelasId, String? hari, String? guruId}) async {
     var q = _c.from('jadwal_pelajaran').select('*, kelas(nama_kelas), mata_pelajaran(nama_mapel), profiles!jadwal_pelajaran_guru_id_fkey(full_name)');

@@ -49,8 +49,11 @@ class _AdminClassesPageState extends State<AdminClassesPage> {
     String? waliKelasId = existing?.waliKelasId;
     List<Map<String, dynamic>> gurus = [];
     try {
-      final d = await SupabaseService.client.from('profiles').select('id, full_name').eq('role', 'guru');
-      gurus = (d as List).cast<Map<String, dynamic>>();
+      final c = SupabaseService.tryClient;
+      if (c != null) {
+        final d = await c.from('profiles').select('id, full_name').eq('role', 'guru');
+        gurus = (d as List).cast<Map<String, dynamic>>();
+      }
     } catch (_) {}
 
     if (!mounted) return;

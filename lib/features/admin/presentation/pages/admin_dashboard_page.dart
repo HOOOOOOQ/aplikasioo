@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/widgets/app_banner.dart';
 import '../../../../core/widgets/loading_view.dart';
 import '../../../../shared/services/supabase_service.dart';
 import '../../../../core/config/supabase_config.dart';
@@ -39,24 +40,29 @@ class StatCard extends StatelessWidget {
 }
 
 final adminStatsProvider = FutureProvider<Map<String, int>>((ref) async {
-  if (SupabaseConfig.isNotConfigured) return {'siswa': 0, 'guru': 0, 'kelas': 0, 'mapel': 0, 'jadwal': 0, 'tugas': 0};
-  final c = SupabaseService.client;
-  final results = await Future.wait([
-    c.from('siswa').select('id'),
-    c.from('profiles').select('id').eq('role', 'guru'),
-    c.from('kelas').select('id'),
-    c.from('mata_pelajaran').select('id'),
-    c.from('jadwal_pelajaran').select('id'),
-    c.from('tugas').select('id').eq('status_publikasi', 'published'),
-  ]);
-  return {
-    'siswa': (results[0] as List).length,
-    'guru': (results[1] as List).length,
-    'kelas': (results[2] as List).length,
-    'mapel': (results[3] as List).length,
-    'jadwal': (results[4] as List).length,
-    'tugas': (results[5] as List).length,
-  };
+  if (!SupabaseService.isReady) return {'siswa': 0, 'guru': 0, 'kelas': 0, 'mapel': 0, 'jadwal': 0, 'tugas': 0};
+  final c = SupabaseService.tryClient;
+  if (c == null) return {'siswa': 0, 'guru': 0, 'kelas': 0, 'mapel': 0, 'jadwal': 0, 'tugas': 0};
+  try {
+    final results = await Future.wait([
+      c.from('siswa').select('id'),
+      c.from('profiles').select('id').eq('role', 'guru'),
+      c.from('kelas').select('id'),
+      c.from('mata_pelajaran').select('id'),
+      c.from('jadwal_pelajaran').select('id'),
+      c.from('tugas').select('id').eq('status_publikasi', 'published'),
+    ]);
+    return {
+      'siswa': (results[0] as List).length,
+      'guru': (results[1] as List).length,
+      'kelas': (results[2] as List).length,
+      'mapel': (results[3] as List).length,
+      'jadwal': (results[4] as List).length,
+      'tugas': (results[5] as List).length,
+    };
+  } catch (_) {
+    return {'siswa': 0, 'guru': 0, 'kelas': 0, 'mapel': 0, 'jadwal': 0, 'tugas': 0};
+  }
 });
 
 class AdminDashboardPage extends ConsumerWidget {
@@ -72,6 +78,8 @@ class AdminDashboardPage extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const EduTaskBanner(height: 38),
+            const SizedBox(height: 12),
             const Text('Dashboard Admin', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const Text('Ringkasan data sekolah', style: TextStyle(color: AppColors.textSecondary)),
             const SizedBox(height: 16),

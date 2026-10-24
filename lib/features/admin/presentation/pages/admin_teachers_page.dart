@@ -34,7 +34,9 @@ class _AdminTeachersPageState extends ConsumerState<AdminTeachersPage> {
     }
     setState(() { _loading = true; _error = null; });
     try {
-      final data = await SupabaseService.client.from('profiles').select().eq('role', 'guru').order('full_name');
+      final c = SupabaseService.tryClient;
+      if (c == null) throw Exception('Supabase belum siap');
+      final data = await c.from('profiles').select().eq('role', 'guru').order('full_name');
       setState(() { _list = (data as List).cast<Map<String, dynamic>>(); _loading = false; });
     } catch (e) {
       setState(() { _loading = false; _error = e.toString(); });
@@ -86,7 +88,9 @@ class _AdminTeachersPageState extends ConsumerState<AdminTeachersPage> {
   Future<void> _toggleActive(Map<String, dynamic> guru) async {
     final current = guru['is_active'] as bool? ?? true;
     try {
-      await SupabaseService.client.from('profiles').update({'is_active': !current}).eq('id', guru['id']);
+      final c = SupabaseService.tryClient;
+      if (c == null) throw Exception('Supabase belum siap');
+      await c.from('profiles').update({'is_active': !current}).eq('id', guru['id']);
       if (mounted) showAppSnackBar(context, current ? 'Guru dinonaktifkan' : 'Guru diaktifkan');
       _load();
     } catch (e) {

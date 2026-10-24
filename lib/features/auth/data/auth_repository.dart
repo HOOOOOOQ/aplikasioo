@@ -1,15 +1,20 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/config/supabase_config.dart';
 import '../../../shared/services/supabase_service.dart';
 import '../domain/app_user.dart';
 
 class AuthRepository {
-  final SupabaseClient _client = SupabaseService.client;
+  SupabaseClient get _client => SupabaseService.client;
+  SupabaseClient? get _tryClient => SupabaseService.tryClient;
 
   Future<AppUser?> getCurrentProfile() async {
+    if (SupabaseConfig.isNotConfigured) return null;
+    final c = _tryClient;
+    if (c == null) return null;
     final user = SupabaseService.currentUser;
     if (user == null) return null;
     try {
-      final data = await _client.from('profiles').select().eq('id', user.id).maybeSingle();
+      final data = await c.from('profiles').select().eq('id', user.id).maybeSingle();
       if (data == null) return null;
       return AppUser.fromJson(data);
     } catch (e) {
@@ -19,22 +24,29 @@ class AuthRepository {
   }
 
   Future<AuthResponse> signIn({required String email, required String password}) async {
-    final res = await _client.auth.signInWithPassword(email: email, password: password);
+    if (SupabaseConfig.isNotConfigured) throw Exception('Supabase belum dikonfigurasi');
+    final c = _tryClient;
+    if (c == null) throw Exception('Supabase belum siap');
+    final res = await c.auth.signInWithPassword(email: email, password: password);
     return res;
   }
 
   Future<void> signOut() async {
-    await _client.auth.signOut();
+    await _tryClient?.auth.signOut();
   }
 
   Future<AppUser?> fetchProfileById(String userId) async {
-    final data = await _client.from('profiles').select().eq('id', userId).maybeSingle();
+    final c = _tryClient;
+    if (c == null) return null;
+    final data = await c.from('profiles').select().eq('id', userId).maybeSingle();
     if (data == null) return null;
     return AppUser.fromJson(data);
   }
 
   Stream<AuthState> authStateChanges() {
-    return _client.auth.onAuthStateChange;
+    final c = _tryClient;
+    if (c == null) return const Stream.empty();
+    return c.auth.onAuthStateChange;
   }
 
   /// Untuk admin: membuat akun guru via Edge Function (aman, service_role di server)

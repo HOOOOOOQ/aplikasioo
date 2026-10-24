@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/widgets/app_banner.dart';
 
 class StudentAboutPage extends StatelessWidget {
   const StudentAboutPage({super.key});
@@ -14,15 +15,12 @@ class StudentAboutPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(20)),
-              child: const Icon(Icons.school, size: 40, color: Colors.white),
-            ),
+            const EduTaskLogo(size: 88),
             const SizedBox(height: 12),
             const Text('EduTask', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primary)),
             const Text('Aplikasi Tugas & Jadwal Pelajaran Sekolah', style: TextStyle(color: AppColors.textSecondary)),
+            const SizedBox(height: 8),
+            const EduTaskBanner(height: 40),
             const SizedBox(height: 8),
             Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: AppColors.primaryContainer, borderRadius: BorderRadius.circular(8)), child: const Text('Versi 1.0.0 • com.edutask.sekolah', style: TextStyle(fontSize: 12, color: AppColors.primary))),
             const SizedBox(height: 20),

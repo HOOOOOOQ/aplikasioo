@@ -3,7 +3,7 @@ import '../../shared/services/supabase_service.dart';
 import '../models/kelas.dart';
 
 class KelasRepository {
-  final SupabaseClient _c = SupabaseService.client;
+  SupabaseClient get _c => SupabaseService.client;
 
   Future<List<Kelas>> fetchAll() async {
     final data = await _c.from('kelas').select('*, profiles!kelas_wali_kelas_id_fkey(full_name)').order('nama_kelas');

@@ -40,18 +40,19 @@ class StudentIdentityNotifier extends StateNotifier<StudentIdentity> {
     final kode = sp.getString(AppConstants.spStudentCodeKey);
     final token = sp.getString(AppConstants.spStudentTokenKey);
     final kelasId = sp.getString(AppConstants.spSelectedKelasId);
-    // Also need siswa details if available? We will fetch from supabase if needed
     if (siswaId != null && kode != null) {
-      // Try to fetch siswa data
-      try {
-        final client = SupabaseService.client;
-        final data = await client.from('siswa').select('*, kelas(nama_kelas)').eq('id', siswaId).maybeSingle();
-        if (data != null) {
-          final kelasNama = (data['kelas'] is Map) ? (data['kelas'] as Map)['nama_kelas'] as String? : null;
-          state = StudentIdentity(siswaId: siswaId, siswaNama: data['nama'] as String?, kelasId: data['kelas_id'] as String? ?? kelasId, kelasNama: kelasNama, kodeAkses: kode, token: token);
-          return;
-        }
-      } catch (_) {}
+      // Try to fetch siswa data only if Supabase ready
+      if (SupabaseService.isReady) {
+        try {
+          final client = SupabaseService.client;
+          final data = await client.from('siswa').select('*, kelas(nama_kelas)').eq('id', siswaId).maybeSingle();
+          if (data != null) {
+            final kelasNama = (data['kelas'] is Map) ? (data['kelas'] as Map)['nama_kelas'] as String? : null;
+            state = StudentIdentity(siswaId: siswaId, siswaNama: data['nama'] as String?, kelasId: data['kelas_id'] as String? ?? kelasId, kelasNama: kelasNama, kodeAkses: kode, token: token);
+            return;
+          }
+        } catch (_) {}
+      }
       state = StudentIdentity(siswaId: siswaId, kodeAkses: kode, token: token, kelasId: kelasId);
     } else if (kelasId != null) {
       state = StudentIdentity(kelasId: kelasId);
@@ -60,6 +61,7 @@ class StudentIdentityNotifier extends StateNotifier<StudentIdentity> {
 
   Future<bool> verifyAndSave(String kode) async {
     try {
+      if (!SupabaseService.isReady) return false;
       final client = SupabaseService.client;
       // Try Edge Function first
       try {

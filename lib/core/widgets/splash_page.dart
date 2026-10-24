@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../config/supabase_config.dart';
 import '../constants/app_colors.dart';
+import 'app_banner.dart';
 import '../../features/auth/presentation/auth_provider.dart';
 import '../../features/auth/domain/app_user.dart';
 
@@ -58,22 +59,30 @@ class _SplashPageState extends ConsumerState<SplashPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
-                child: const Icon(Icons.school_rounded, size: 56, color: AppColors.primary),
-              ),
+              // Banner logo utama — anti FC dengan errorBuilder
+              const EduTaskLogo(size: 110),
               const SizedBox(height: 20),
               const Text('EduTask', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1)),
               const SizedBox(height: 8),
-              const Text('Tugas & Jadwal Sekolah', style: TextStyle(fontSize: 14, color: Colors.white70)),
-              const SizedBox(height: 40),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(color: Colors.white.withOpacity(0.18), borderRadius: BorderRadius.circular(20)),
+                child: const Text('Tugas & Jadwal Sekolah', style: TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w500)),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                child: const Text('com.edutask.sekolah • v1.0.0', style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(height: 32),
               const SizedBox(
                 width: 32,
                 height: 32,
                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
               ),
+              const SizedBox(height: 12),
+              const Text('Memuat...', style: TextStyle(color: Colors.white70, fontSize: 12)),
             ],
           ),
         ),
