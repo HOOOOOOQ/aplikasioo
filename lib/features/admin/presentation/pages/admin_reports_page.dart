@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/loading_view.dart';
+import '../../../../shared/models/kelas.dart';
 import '../../../../shared/services/supabase_service.dart';
 import '../../../../shared/repositories/kelas_repository.dart';
 import '../../../../shared/repositories/tugas_repository.dart';
@@ -51,7 +52,7 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             FutureBuilder(
-              future: SupabaseConfig.isNotConfigured ? Future.value(<dynamic>[]) : KelasRepository().fetchAll(),
+              future: SupabaseConfig.isNotConfigured ? Future.value(<Kelas>[]) : KelasRepository().fetchAll(),
               builder: (ctx, snap) {
                 if (snap.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
                 final list = snap.data ?? [];

@@ -5,6 +5,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/date_utils.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/widgets/loading_view.dart';
+import '../../../../shared/models/kelas.dart';
 import '../../../../shared/repositories/kelas_repository.dart';
 import '../../../../shared/repositories/jadwal_repository.dart';
 import '../../../../shared/models/jadwal.dart';
@@ -153,12 +154,12 @@ class _StudentSchedulePageState extends ConsumerState<StudentSchedulePage> {
     );
   }
 
-  Future<List<dynamic>> _safeKelas() async {
-    if (SupabaseConfig.isNotConfigured) return [];
+  Future<List<Kelas>> _safeKelas() async {
+    if (SupabaseConfig.isNotConfigured) return <Kelas>[];
     try {
       return await KelasRepository().fetchAll();
     } catch (_) {
-      return [];
+      return <Kelas>[];
     }
   }
 

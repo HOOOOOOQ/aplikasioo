@@ -6,6 +6,7 @@ import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/widgets/loading_view.dart';
 import '../../../../shared/models/siswa.dart';
+import '../../../../shared/models/kelas.dart';
 import '../../../../shared/repositories/siswa_repository.dart';
 import '../../../../shared/repositories/kelas_repository.dart';
 import '../../../../core/config/supabase_config.dart';
@@ -50,10 +51,7 @@ class _AdminStudentsPageState extends ConsumerState<AdminStudentsPage> {
     final nisC = TextEditingController(text: existing?.nomorInduk ?? '');
     String? kelasId = existing?.kelasId;
     final formKey = GlobalKey<FormState>();
-    List<dynamic> kelasList = [];
-    try {
-      kelasList = await KelasRepository().fetchAll();
-    } catch (_) {}
+    final kelasList = await KelasRepository().fetchAll();
 
     if (!mounted) return;
     final saved = await showDialog<bool>(
@@ -200,12 +198,12 @@ class _AdminStudentsPageState extends ConsumerState<AdminStudentsPage> {
     );
   }
 
-  Future<List<dynamic>> _safeKelasFilter() async {
-    if (SupabaseConfig.isNotConfigured) return [];
+  Future<List<Kelas>> _safeKelasFilter() async {
+    if (SupabaseConfig.isNotConfigured) return <Kelas>[];
     try {
       return await KelasRepository().fetchAll();
     } catch (_) {
-      return [];
+      return <Kelas>[];
     }
   }
 }

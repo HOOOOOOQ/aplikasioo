@@ -7,6 +7,7 @@ import '../../../../core/utils/deadline_helper.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/widgets/loading_view.dart';
 import '../../../../core/widgets/status_chip.dart';
+import '../../../../shared/models/kelas.dart';
 import '../../../../shared/models/tugas.dart';
 import '../../../../shared/repositories/kelas_repository.dart';
 import '../../../../shared/repositories/mapel_repository.dart';
@@ -179,12 +180,12 @@ class _StudentTaskListPageState extends ConsumerState<StudentTaskListPage> {
     );
   }
 
-  Future<List<dynamic>> _safeKelas() async {
-    if (SupabaseConfig.isNotConfigured) return [];
+  Future<List<Kelas>> _safeKelas() async {
+    if (SupabaseConfig.isNotConfigured) return <Kelas>[];
     try {
       return await KelasRepository().fetchAll();
     } catch (_) {
-      return [];
+      return <Kelas>[];
     }
   }
 
