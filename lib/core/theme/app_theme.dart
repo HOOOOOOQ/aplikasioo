@@ -10,7 +10,6 @@ class AppTheme {
         primary: AppColors.primary,
         secondary: AppColors.primaryLight,
         surface: AppColors.surface,
-        background: AppColors.background,
         error: AppColors.error,
       ),
       scaffoldBackgroundColor: AppColors.background,
@@ -25,7 +24,7 @@ class AppTheme {
           color: Colors.white,
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.surface,
         elevation: 0,
         shape: RoundedRectangleBorder(

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 import '../models/tugas.dart';
@@ -146,7 +148,7 @@ class TugasRepository {
 
   Future<String?> uploadLampiran({required String fileName, required List<int> bytes}) async {
     final path = '${DateTime.now().millisecondsSinceEpoch}_$fileName';
-    await _c.storage.from('lampiran-tugas').uploadBinary(path, bytes);
+    await _c.storage.from('lampiran-tugas').uploadBinary(path, Uint8List.fromList(bytes));
     return path;
   }
 

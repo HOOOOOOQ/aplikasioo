@@ -9,7 +9,7 @@ class SiswaRepository {
     var query = _c.from('siswa').select('*, kelas(nama_kelas)');
     if (kelasId != null && kelasId.isNotEmpty) query = query.eq('kelas_id', kelasId);
     final data = await query.order('nama');
-    var list = (data as List).map((e) => Siswa.fromJson(e as Map<String, dynamic>)).copyWithKelas()).toList();
+    var list = (data as List).map((e) => Siswa.fromJson(e as Map<String, dynamic>)).toList();
     // fallback manually for kelasNama mapping
     // Actually via fromJson
     if (search != null && search.trim().isNotEmpty) {
