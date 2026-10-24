@@ -51,12 +51,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       showAppSnackBar(context, 'Supabase belum dikonfigurasi', isError: true);
       return;
     }
-    List<dynamic> kelasList = [];
-    List<dynamic> mapelList = [];
-    try {
-      kelasList = await KelasRepository().fetchAll();
-      mapelList = await MapelRepository().fetchAll();
-    } catch (_) {}
+    final kelasList = await KelasRepository().fetchAll();
+    final mapelList = await MapelRepository().fetchAll();
     if (kelasList.isEmpty || mapelList.isEmpty) {
       if (mounted) showAppSnackBar(context, 'Data kelas/mapel belum tersedia', isError: true);
       return;
@@ -145,7 +141,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
               children: [
                 Expanded(
                   child: FutureBuilder(
-                    future: SupabaseConfig.isNotConfigured ? Future.value(<dynamic>[]) : KelasRepository().fetchAll(),
+                    future: SupabaseConfig.isNotConfigured ? Future.value(<Kelas>[]) : KelasRepository().fetchAll(),
                     builder: (ctx, snap) {
                       final list = snap.data ?? [];
                       return DropdownButtonFormField<String>(
