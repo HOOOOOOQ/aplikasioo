@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
+  issues: write
 
 jobs:
   build:
@@ -64,6 +66,23 @@ jobs:
           path: build-apk.log
           if-no-files-found: warn
           retention-days: 7
+
+      - name: Comment build log on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let log = '';
+            try { log = fs.readFileSync('build-apk.log', 'utf8').slice(-8000); } catch(e) { log = 'no log file: '+e; }
+            const body = `❌ Build APK gagal. Tail log (8000 chars):\n\n\`\`\`\n${log}\n\`\`\``;
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number || 0,
+              body: body
+            }).catch(e=>console.log('comment fail',e));
+            core.summary.addRaw(body).write();
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
