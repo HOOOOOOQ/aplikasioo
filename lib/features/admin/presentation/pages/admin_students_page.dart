@@ -50,7 +50,10 @@ class _AdminStudentsPageState extends ConsumerState<AdminStudentsPage> {
     final nisC = TextEditingController(text: existing?.nomorInduk ?? '');
     String? kelasId = existing?.kelasId;
     final formKey = GlobalKey<FormState>();
-    final kelasList = await KelasRepository().fetchAll();
+    List<dynamic> kelasList = [];
+    try {
+      kelasList = await KelasRepository().fetchAll();
+    } catch (_) {}
 
     if (!mounted) return;
     final saved = await showDialog<bool>(
@@ -126,9 +129,9 @@ class _AdminStudentsPageState extends ConsumerState<AdminStudentsPage> {
             ),
           ),
           FutureBuilder(
-            future: KelasRepository().fetchAll(),
+            future: _safeKelasFilter(),
             builder: (ctx, snap) {
-              if (!snap.hasData) return const SizedBox();
+              if (!snap.hasData || snap.data == null) return const SizedBox();
               final list = snap.data!;
               return SizedBox(
                 height: 40,
@@ -195,5 +198,14 @@ class _AdminStudentsPageState extends ConsumerState<AdminStudentsPage> {
         ],
       ),
     );
+  }
+
+  Future<List<dynamic>> _safeKelasFilter() async {
+    if (SupabaseConfig.isNotConfigured) return [];
+    try {
+      return await KelasRepository().fetchAll();
+    } catch (_) {
+      return [];
+    }
   }
 }
