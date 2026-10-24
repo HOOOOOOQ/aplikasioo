@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../auth/domain/app_user.dart';
 import '../../../auth/presentation/auth_provider.dart';
 
 class TeacherProfilePage extends ConsumerWidget {
