@@ -78,11 +78,19 @@ class _StudentTaskListPageState extends ConsumerState<StudentTaskListPage> {
                 ),
                 const SizedBox(height: 8),
                 FutureBuilder(
-                  future: KelasRepository().fetchAll(),
+                  future: _safeKelas(),
                   builder: (ctx, snap) {
-                    if (!snap.hasData) return const SizedBox(height: 20, child: LinearProgressIndicator());
-                    final list = snap.data!;
-                    if (list.isEmpty) return const SizedBox();
+                    if (snap.connectionState == ConnectionState.waiting) return const SizedBox(height: 20, child: LinearProgressIndicator());
+                    final list = snap.data ?? [];
+                    if (list.isEmpty) {
+                      if (SupabaseConfig.isNotConfigured) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 6),
+                          child: Text('Mode demo — pilih kelas akan aktif setelah Supabase dikonfigurasi', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                        );
+                      }
+                      return const SizedBox();
+                    }
                     final val = _kelasId ?? list.first.id;
                     if (_kelasId == null) WidgetsBinding.instance.addPostFrameCallback((_) => setState(() => _kelasId = val));
                     return DropdownButtonFormField<String>(
@@ -109,12 +117,13 @@ class _StudentTaskListPageState extends ConsumerState<StudentTaskListPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                // Mapel filter
+                // Mapel filter — guarded
                 FutureBuilder<List<MataPelajaran>>(
-                  future: MapelRepository().fetchAll(),
+                  future: _safeMapel(),
                   builder: (ctx, snap) {
-                    if (!snap.hasData) return const SizedBox();
+                    if (!snap.hasData || snap.data == null) return const SizedBox();
                     final mapels = snap.data!;
+                    if (mapels.isEmpty && SupabaseConfig.isNotConfigured) return const SizedBox();
                     return SizedBox(
                       height: 40,
                       child: ListView(
@@ -170,11 +179,33 @@ class _StudentTaskListPageState extends ConsumerState<StudentTaskListPage> {
     );
   }
 
+  Future<List<dynamic>> _safeKelas() async {
+    if (SupabaseConfig.isNotConfigured) return [];
+    try {
+      return await KelasRepository().fetchAll();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<List<MataPelajaran>> _safeMapel() async {
+    if (SupabaseConfig.isNotConfigured) return [];
+    try {
+      return await MapelRepository().fetchAll();
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<List<Tugas>> _fetchTugas() async {
     if (SupabaseConfig.isNotConfigured) return [];
-    final identity = ref.read(studentIdentityProvider);
-    final repo = TugasRepository();
-    return repo.fetchAll(kelasId: _kelasId, search: _search.isEmpty ? null : _search, mapelId: _filterMapelId, siswaId: identity.siswaId);
+    try {
+      final identity = ref.read(studentIdentityProvider);
+      final repo = TugasRepository();
+      return await repo.fetchAll(kelasId: _kelasId, search: _search.isEmpty ? null : _search, mapelId: _filterMapelId, siswaId: identity.siswaId);
+    } catch (_) {
+      return [];
+    }
   }
 
   List<Tugas> _applyStatusFilter(List<Tugas> list) {

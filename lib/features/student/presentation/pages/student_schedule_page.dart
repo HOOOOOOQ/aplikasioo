@@ -43,13 +43,22 @@ class _StudentSchedulePageState extends ConsumerState<StudentSchedulePage> {
       ),
       body: Column(
         children: [
-          // Kelas selector
+          // Kelas selector — guarded for demo mode
           FutureBuilder(
-            future: KelasRepository().fetchAll(),
+            future: _safeKelas(),
             builder: (ctx, snap) {
-              if (!snap.hasData) return const LinearProgressIndicator();
-              final list = snap.data!;
-              if (list.isEmpty) return const SizedBox();
+              if (snap.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
+              if (snap.hasError) return const SizedBox();
+              final list = snap.data ?? [];
+              if (list.isEmpty) {
+                if (SupabaseConfig.isNotConfigured) {
+                  return const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Text('Mode demo: data kelas akan muncul setelah Supabase dikonfigurasi', style: TextStyle(fontSize: 12, color: AppColors.textSecondary), textAlign: TextAlign.center),
+                  );
+                }
+                return const SizedBox();
+              }
               final val = _kelasId ?? list.first.id;
               if (_kelasId == null) WidgetsBinding.instance.addPostFrameCallback((_) => setState(() => _kelasId = val));
               return Padding(
@@ -144,17 +153,30 @@ class _StudentSchedulePageState extends ConsumerState<StudentSchedulePage> {
     );
   }
 
+  Future<List<dynamic>> _safeKelas() async {
+    if (SupabaseConfig.isNotConfigured) return [];
+    try {
+      return await KelasRepository().fetchAll();
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<List<Jadwal>> _fetchJadwal(String kelasId, String hariIni, String besok) async {
     if (SupabaseConfig.isNotConfigured) return [];
-    String? hariFilter;
-    if (_selectedHari != 'Semua' && _selectedHari != 'Hari Ini' && _selectedHari != 'Besok') {
-      hariFilter = _selectedHari;
-    } else if (_selectedHari == 'Hari Ini') {
-      hariFilter = hariIni;
-    } else if (_selectedHari == 'Besok') {
-      hariFilter = besok;
+    try {
+      String? hariFilter;
+      if (_selectedHari != 'Semua' && _selectedHari != 'Hari Ini' && _selectedHari != 'Besok') {
+        hariFilter = _selectedHari;
+      } else if (_selectedHari == 'Hari Ini') {
+        hariFilter = hariIni;
+      } else if (_selectedHari == 'Besok') {
+        hariFilter = besok;
+      }
+      final repo = JadwalRepository();
+      return await repo.fetchAll(kelasId: kelasId, hari: hariFilter);
+    } catch (_) {
+      return [];
     }
-    final repo = JadwalRepository();
-    return repo.fetchAll(kelasId: kelasId, hari: hariFilter);
   }
 }

@@ -154,13 +154,15 @@ class _TeacherTaskFormPageState extends State<TeacherTaskFormPage> {
               const SizedBox(height: 12),
               TextFormField(controller: _deskripsiC, decoration: const InputDecoration(labelText: 'Deskripsi / Instruksi *'), maxLines: 5, validator: Validators.description),
               const SizedBox(height: 12),
-              FutureBuilder(future: KelasRepository().fetchAll(), builder: (ctx, snap) {
+              FutureBuilder(future: SupabaseConfig.isNotConfigured ? Future.value(<dynamic>[]) : KelasRepository().fetchAll(), builder: (ctx, snap) {
                 final list = snap.data ?? [];
+                if (list.isEmpty && SupabaseConfig.isNotConfigured) return const Text('Kelas: mode demo — tidak tersedia', style: TextStyle(fontSize: 12, color: AppColors.textSecondary));
                 return DropdownButtonFormField<String>(value: _kelasId, decoration: const InputDecoration(labelText: 'Kelas Tujuan *', prefixIcon: Icon(Icons.class_outlined)), items: list.map((k) => DropdownMenuItem(value: k.id, child: Text(k.namaKelas))).toList(), onChanged: (v) => setState(() => _kelasId = v), validator: (v) => Validators.requiredField(v, fieldName: 'Kelas'));
               }),
               const SizedBox(height: 12),
-              FutureBuilder(future: MapelRepository().fetchAll(), builder: (ctx, snap) {
+              FutureBuilder(future: SupabaseConfig.isNotConfigured ? Future.value(<dynamic>[]) : MapelRepository().fetchAll(), builder: (ctx, snap) {
                 final list = snap.data ?? [];
+                if (list.isEmpty && SupabaseConfig.isNotConfigured) return const Text('Mapel: mode demo — tidak tersedia', style: TextStyle(fontSize: 12, color: AppColors.textSecondary));
                 return DropdownButtonFormField<String>(value: _mapelId, decoration: const InputDecoration(labelText: 'Mata Pelajaran *', prefixIcon: Icon(Icons.menu_book_outlined)), items: list.map((m) => DropdownMenuItem(value: m.id, child: Text(m.namaMapel))).toList(), onChanged: (v) => setState(() => _mapelId = v), validator: (v) => Validators.requiredField(v, fieldName: 'Mata Pelajaran'));
               }),
               const SizedBox(height: 12),

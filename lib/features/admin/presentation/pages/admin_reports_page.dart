@@ -51,8 +51,9 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             FutureBuilder(
-              future: KelasRepository().fetchAll(),
+              future: SupabaseConfig.isNotConfigured ? Future.value(<dynamic>[]) : KelasRepository().fetchAll(),
               builder: (ctx, snap) {
+                if (snap.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
                 final list = snap.data ?? [];
                 return DropdownButtonFormField<String>(
                   value: _filterKelas,

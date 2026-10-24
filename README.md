@@ -1,131 +1,163 @@
 # EduTask — Aplikasi Tugas dan Jadwal Pelajaran Sekolah
 
-Aplikasi Android modern untuk mengelola tugas, jadwal pelajaran, dan laporan penyelesaian tugas dengan peran **Admin**, **Guru**, dan **Siswa** (tanpa login).
+<p align="center">
+  <img src="assets/images/edutask_banner.png" alt="EduTask Banner" width="100%" />
+</p>
 
-> **Package:** `com.edutask.sekolah` | **Framework:** Flutter Stable (3.24.x) | **Backend:** Supabase (PostgreSQL) | **Design:** Material 3
+<p align="center">
+  <img src="assets/images/edutask_logo.png" alt="EduTask Logo" width="140" />
+  <br/>
+  <strong>Package:</strong> <code>com.edutask.sekolah</code> |
+  <strong>Framework:</strong> Flutter 3.35.4 Stable |
+  <strong>Backend:</strong> Supabase (PostgreSQL) |
+  <strong>Design:</strong> Material 3
+</p>
 
----
+<p align="center">
+  <img src="https://img.shields.io/badge/Flutter-3.35.4-02569B?style=for-the-badge&logo=flutter" alt="Flutter"/>
+  <img src="https://img.shields.io/badge/Dart-%3E%3D3.4.0-0175C2?style=for-the-badge&logo=dart" alt="Dart"/>
+  <img src="https://img.shields.io/badge/Supabase-Postgres-3FCF8E?style=for-the-badge&logo=supabase" alt="Supabase"/>
+  <img src="https://img.shields.io/badge/Platform-Android-34C759?style=for-the-badge&logo=android" alt="Android"/>
+</p>
 
-## 📸 Screenshot (Placeholder)
-
-| Splash | Siswa Beranda | Jadwal | Tugas | Admin Dashboard | Guru Dashboard |
-|---|---|---|---|---|---|
-| ![splash](assets/images/splash_placeholder.png) | ![beranda](assets/images/beranda_placeholder.png) | ![jadwal](assets/images/jadwal_placeholder.png) | ![tugas](assets/images/tugas_placeholder.png) | ![admin](assets/images/admin_placeholder.png) | ![guru](assets/images/guru_placeholder.png) |
-
-> Tambahkan screenshot asli setelah menjalankan aplikasi di emulator/device.
-
----
-
-## ✨ Fitur
-
-### 👨‍🎓 Siswa (Tanpa Login)
-- Langsung masuk ke Beranda tanpa login
-- Pilih kelas untuk melihat jadwal & tugas
-- Jadwal: hari ini / besok / mingguan / per hari
-- Tugas dengan filter: Semua, Belum selesai, Selesai, Mendekati tenggat (<24 jam), Terlambat
-- Detail tugas + lampiran + informasi guru
-- Tandai tugas selesai:
-  - **Opsi utama:** Masukkan **kode siswa** (`SISWA-XXX`) yang diberikan sekolah → divalidasi server via Edge Function → laporan resmi ke guru
-  - **Alternatif:** Tanpa kode → status disimpan lokal di perangkat (tidak menjadi laporan resmi, dijelaskan eksplisit di UI)
-- Zona waktu Asia/Jakarta, sisa waktu, dan indikator warna (hijau/oranye/merah)
-
-### 👨‍🏫 Guru (Login)
-- Dashboard: jadwal hari ini, tugas aktif, mendekati tenggat, statistik penyelesaian
-- Kelola tugas miliknya: tambah/edit/hapus, upload lampiran (max 10MB, pdf/doc/ppt/jpg/png/zip)
-- Lihat status penyelesaian per siswa (hanya untuk tugas miliknya)
-- Tidak bisa edit tugas guru lain
-
-### 👨‍💼 Admin (Login)
-- Dashboard statistik: total siswa, guru, kelas, mapel, jadwal, tugas aktif
-- CRUD: Siswa (NIK unik, filter kelas), Guru (undang via Edge Function aman), Kelas, Mata Pelajaran, Jadwal (validasi bentrok kelas/guru + jam selesai > jam mulai), Tugas
-- Laporan penyelesaian dengan filter kelas/guru/mapel/tanggal & persentase
-- Pengaturan & status Supabase
+Aplikasi Android modern untuk mengelola tugas, jadwal pelajaran, dan laporan penyelesaian tugas dengan 3 peran **Admin**, **Guru**, dan **Siswa (tanpa login)**. Dibangun feature-first, Riverpod + GoRouter, anti-force-close, siap install di semua Android 5.1+.
 
 ---
 
-## 🛠️ Teknologi
+## 🖼️ Tampilan Aplikasi
 
-- **Flutter** 3.24.x stable, **Dart** >=3.4.0
-- **State:** Riverpod 2.5.1
-- **Routing:** GoRouter 14.2.7
-- **Backend:** Supabase (supabase_flutter 2.5.6) — PostgreSQL + Auth + Storage + Edge Functions
-- **Lainnya:** intl, shared_preferences, flutter_local_notifications, timezone, file_picker, fl_chart, cached_network_image, url_launcher, logger, gap, shimmer
-- **Android:** compileSdk 34, minSdk 21, targetSdk 34, AGP 8.3.0, Gradle 8.7, Java 17, Kotlin 1.9.22
+| Siswa — Beranda & Kelas | Siswa — Jadwal | Siswa — Daftar Tugas |
+|---|---|---|
+| Banner EduTask + pilih kelas → jadwal & tugas langsung muncul | Filter hari: Semua / Hari Ini / Besok / Senin–Minggu | Search, filter status (Selesai/Mendekati/Terlambat), filter mapel |
+
+| Admin Dashboard | Guru Dashboard | Detail Tugas |
+|---|---|---|
+| Statistik siswa/guru/kelas/mapel + drawer manajemen | Jadwal hari ini & tugas aktif + status siswa | Lampiran, tenggat Asia/Jakarta, warna deadline, tombol selesai via kode |
+
+> Banner & logo di atas (`assets/images/edutask_banner.png` dan `edutask_logo.png`) dipakai langsung di aplikasi: Splash (logo 110 + banner), Login, Student Home AppBar + banner, Admin/Teacher Drawer Header, About page. Launcher icon Android `mipmap-*` juga dari logo yang sama.
+
+Untuk screenshot fisik: jalankan `flutter run` lalu ambil screenshot dari emulator/device dan letakkan di folder `docs/screenshots/` — otomatis tampil di README ini setelah di-push.
 
 ---
 
-## 📦 Persyaratan Instalasi
+## ✨ Fitur Lengkap & Status
 
-- Flutter SDK stable (≥3.22.0) — [install](https://docs.flutter.dev/get-started/install)
-- Dart SDK ≥3.4.0
-- Android Studio atau VS Code
-- Java 17 (Temurin disarankan)
-- Akun Supabase (gratis) — https://supabase.com
+### 👨‍🎓 Siswa — Tanpa Login (publik)
+- ✅ Langsung masuk Beranda — tidak perlu login
+- ✅ Pilih kelas → lihat jadwal & tugas kelas tersebut dari Supabase
+- ✅ Jadwal: filter Semua / Hari Ini / Besok / Senin–Minggu, group by hari, highlight hari ini/besok
+- ✅ Daftar Tugas: search judul/mapel, filter status (Semua/Belum selesai/Selesai/Mendekati tenggat/Terlambat), filter mapel
+- ✅ Detail tugas: guru, kelas, deskripsi, lampiran (Storage public URL), download via `url_launcher`
+- ✅ Deadline helper: **hijau** selesai, **oranye** <24 jam, **merah** terlambat, **biru** aktif — zona **Asia/Jakarta** (`timezone` + `AppDateUtils.toJakarta`)
+- ✅ Tandai selesai:
+  - **Utama (server-validated):** Masukkan **Kode Siswa** (`SISWA-XXX` unik dari sekolah) → validasi via Edge Function `update-student-task-status` + `student-access` (token terbatas) → baris `status_tugas_siswa` tampil di laporan guru/admin
+  - **Fallback lokal (offline/demo):** Tanpa kode → status `selesai` disimpan di perangkat (`SharedPreferences` via `localTaskStatusProvider`) — eksplisit dijelaskan di UI sebagai *tidak resmi*
+- ✅ **Anti-FC:** Semua halaman siswa guard `SupabaseConfig.isNotConfigured` / `SupabaseService.isReady`. Saat demo tanpa config, tampil `EmptyState`/pesan mode demo — tidak throw `StateError` atau stuck di `LinearProgressIndicator`.
+
+### 👨‍🏫 Guru — Login via Supabase Auth
+- ✅ Login `email + password` (`supabase_auth`) → tabel `profiles.role = guru`
+- ✅ Dashboard: jadwal mengajar hari ini (via `JadwalRepository.fetchByGuru`), tugas aktif, mendekati tenggat, ringkasan penyelesaian
+- ✅ CRUD tugas miliknya: judul/deskripsi/kelas/mapel/tanggal mulai & tenggat — jam selesai > jam mulai divalidasi
+- ✅ Lampiran upload: `file_picker` → `TugasRepository.uploadLampiran` ke bucket `lampiran-tugas` (max 10MB, ekstensi `pdf/doc/ppt/jpg/png/zip` dll) + `getPublicUrl()`
+- ✅ Halaman Status Siswa per tugas: `fetchStatusForTugas` + `fetchSummary` (total siswa di kelas vs selesai/belum)
+- ✅ Guard: semua fetch via `tryClient` + early `isNotConfigured` return; delete dengan `confirm_dialog`; error SnackBar bukan FC
+
+### 👨‍💼 Admin — Login via Supabase Auth
+- ✅ Dashboard statistik: total siswa/guru/kelas/mapel/jadwal/tugas aktif (kartu metrik)
+- ✅ CRUD Siswa: NIS unik, pilih kelas via `DropdownButtonFormField` (guarded), kode akses auto `SISWA-<NIS>-<epoch>`
+- ✅ CRUD Guru: undang via Edge Function `create-teacher` (service_role hanya di server), fallback info jika belum deploy
+- ✅ CRUD Kelas: `nama_kelas` + `tingkat` + `tahun_ajaran` + `wali_kelas`
+- ✅ CRUD Mapel: `nama_mapel` + deskripsi
+- ✅ Jadwal Pelajaran: `kelas_id + hari + jam_mulai/jam_selesai + guru_id` — trigger DB anti-bentrok kelas/guru, validasi `jam_selesai > jam_mulai`
+- ✅ Manajemen Tugas (read + hapus) & Laporan: filter kelas, ringkasan PieChart (`fl_chart`), persentase `selesai/total` per tugas via `TugasRepository.fetchSummary`
+- ✅ Pengaturan & Status Supabase — indikator configured/not configured
+
+---
+
+## 🛠️ Teknologi & Versi Terkunci
+
+- **Flutter** 3.35.4 Stable, **Dart** ≥3.4.0 (tested `sdk: ">=3.4.0 <4.0.0"`)
+- **State:** `flutter_riverpod 2.5.1`
+- **Routing:** `go_router 14.2.7` (redirect: splash → `/siswa` / `/login` / `/admin` / `/guru` sesuai role & `SupabaseConfig.isNotConfigured`)
+- **Backend:** `supabase_flutter 2.5.6` — PostgreSQL + Auth + Storage + Edge Functions + Realtime (opsional)
+- **Lainnya:** `intl 0.20.2`, `shared_preferences 2.3.2`, `flutter_local_notifications 17.1.2`, `timezone 0.9.2`, `file_picker 8.0.6`, `fl_chart 0.69.0`, `cached_network_image 3.3.0`, `url_launcher 6.2.5`, `logger 2.4.0`, `gap 3.0.1`, `shimmer 3.0.0`
+- **Android:** `compileSdk 36`, `minSdk 21` (Android 5.1+), `targetSdk 36`, `AGP 8.11.1`, `Gradle 8.13`, `Kotlin 2.1.0`, `Java 17`, `NDK flutter.ndkVersion`, `multiDexEnabled true`, `coreLibraryDesugaring 2.1.4`
+- **Launcher icon:** 5 density mipmap (`mdpi 48` → `xxxhdpi 192`) dari `edutask_logo.png` via ImageMagick — tidak lagi 68-byte placeholder
+- **Assets:** `assets/images/edutask_logo.png` (776KB) + `edutask_banner.png` (795KB) → dipakai `app_banner.dart` (`EduTaskLogo`/`EduTaskBanner`/`EduTaskHeaderBanner`) dengan `errorBuilder` fallback gradient
+
+---
+
+## 📦 Persyaratan Instalasi (Laptop)
+
+- Flutter SDK stable **≥3.22.0** (disarankan **3.35.4** sama seperti CI) — https://docs.flutter.dev/get-started/install
+- Dart ≥3.4.0 (bundle Flutter)
+- Android Studio / VS Code + Android SDK
+- Java **17** (Temurin) — wajib untuk AGP 8.11.1 + Gradle 8.13
+- Akun Supabase gratis — https://supabase.com
 - Git
 
-Cek instalasi:
+Cek:
 ```bash
-flutter doctor
+flutter doctor -v
 flutter --version
-java -version
+java -version   # harus 17
 ```
 
 ---
 
-## ⚙️ Cara Mengatur Supabase
+## ⚙️ Cara Atur Supabase (5 langkah)
 
-### 1. Buat Proyek Supabase
-1. Buka https://supabase.com/dashboard → **New Project** → nama: `EduTask`
-2. Catat **Project URL** dan **anon public key** di Project Settings → API
+### 1. Buat Project Supabase
+Dashboard → **New Project** → nama `EduTask` → catat **Project URL** (`https://xxx.supabase.co`) & **anon key** (Project Settings → API → `anon public`).
 
 ### 2. Jalankan SQL Migration
-1. Buka Supabase Dashboard → **SQL Editor** → **New query**
-2. Copy-paste isi file `supabase/migrations/001_initial_schema.sql` → **Run**
-3. Pastikan semua tabel & RLS policies terbuat tanpa error
+Supabase → **SQL Editor** → **New query** → copy-paste `supabase/migrations/001_initial_schema.sql` → **Run**.  
+Isinya: 8+ tabel (`profiles`, `siswa`, `kelas`, `mata_pelajaran`, `guru_mapel`, `jadwal_pelajaran`, `tugas`, `status_tugas_siswa`) + FK/Index/Constraint + trigger anti-duplikat & anti-bentrok jadwal.
 
-### 3. Buat Storage Bucket
-1. Buka **Storage** → **New Bucket** → `lampiran-tugas` → **Public bucket** = true
-2. Atur policies storage (lihat komentar di file SQL migration)
+### 3. Storage Bucket
+**Storage** → **New Bucket** → `lampiran-tugas` → **Public = true**.  
+Policies ada di komentar migration — `insert` hanya untuk `authenticated`, `select` untuk public/anon sesuai tugas published.
 
-### 4. Buat Admin Pertama
+### 4. Akun Admin Pertama
 ```sql
--- 1. Buat user via Dashboard: Authentication -> Users -> Add user (misal admin@sekolah.id)
--- 2. Jalankan di SQL Editor (ganti UUID):
+-- 1) Authentication → Users → Add user (misal admin@sekolah.id / password)
+-- 2) Ambil UUID-nya, jalankan:
 insert into public.profiles (id, full_name, email, role, is_active)
 values ('<uuid-dari-auth.users>', 'Administrator', 'admin@sekolah.id', 'admin', true);
+-- Untuk guru: role = 'guru'
 ```
 
-### 5. Deploy Edge Functions (Opsional tapi disarankan)
+### 5. Edge Functions (opsional tapi disarankan)
 ```bash
-npm install -g supabase
+npm i -g supabase
 supabase login
 supabase link --project-ref <project-ref>
 supabase functions deploy create-teacher --no-verify-jwt
 supabase functions deploy student-access --no-verify-jwt
 supabase functions deploy update-student-task-status --no-verify-jwt
 ```
-Set secrets di Dashboard → Edge Functions → Secrets:
-- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`
-
-> Jika tidak deploy, fitur undang guru & validasi kode siswa akan fallback ke mode terbatas (lihat logs).
+Dashboard → Edge Functions → **Secrets**: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`.  
+Jika belum deploy: undang guru & validasi kode siswa akan fallback (sudah di-handle tanpa FC) dan tampil log.
 
 ---
 
-## 🚀 Cara Menjalankan Flutter di Laptop
+## 🚀 Menjalankan di Laptop
 
 ```bash
 git clone https://github.com/HOOOOOOQ/aplikasioo.git
 cd aplikasioo
 flutter pub get
 
-# Jalankan dengan Supabase config (WAJIB jika sudah punya project)
-flutter run --dart-define=SUPABASE_URL=https://xxx.supabase.co --dart-define=SUPABASE_ANON_KEY=eyJ...
+# Dengan Supabase (Wajib untuk data real):
+flutter run --dart-define=SUPABASE_URL=https://xxx.supabase.co --dart-define=SUPABASE_ANON_KEY=eyJhbGc...
 
-# Atau tanpa config untuk mode demo (data kosong, UI tetap jalan)
+# Tanpa config — mode DEMO (UI jalan, data kosong, tampil EmptyState + banner warning):
 flutter run
 ```
 
-**VS Code:** Buat `.vscode/launch.json`:
+`main.dart` sudah guard: `SupabaseConfig.isConfigured` → `Supabase.initialize(...)` di `try/catch`, `tz.initializeTimeZones()` + `initializeDateFormatting('id_ID')` di `try/catch`, `NotificationService.init()` di `try/catch`, `FlutterError.onError` global handler — tidak FC diam-diam.
+
+**VS Code** `.vscode/launch.json`:
 ```json
 {
   "version": "0.2.0",
@@ -136,7 +168,7 @@ flutter run
       "type": "dart",
       "toolArgs": [
         "--dart-define=SUPABASE_URL=https://xxx.supabase.co",
-        "--dart-define=SUPABASE_ANON_KEY=eyJhbG..."
+        "--dart-define=SUPABASE_ANON_KEY=eyJhbGciOi..."
       ]
     }
   ]
@@ -145,103 +177,96 @@ flutter run
 
 ---
 
-## 🧪 Cara Menjalankan Test
+## 🧪 Test & Analyze
 
 ```bash
-flutter analyze
+flutter analyze          # harus 0 issue (flutter_lints 4.0)
 flutter test
 flutter test --coverage
 ```
+Test meliputi: `deadline logic` (selesai/terlambat/mendekati), format tanggal & hari Indonesia, role mapping, akses publik siswa, validasi RLS.
 
-Test mencakup:
-- Deadline logic (selesai/terlambat/mendekati)
-- Format tanggal & hari Indonesia
-- Role mapping
-- Akses publik siswa tanpa login
-- Validasi RLS role-based
+CI (GitHub Actions) menjalankan `flutter analyze` + `flutter test` sebelum build — build gagal jika analyze/test merah.
 
 ---
 
-## 📤 Cara Mengunggah ke GitHub
+## 🏗️ Build APK — GitHub Actions
 
-```bash
-git init
-git remote add origin https://github.com/HOOOOOOQ/aplikasioo.git
-git add .
-git commit -m "feat: EduTask v1.0.0"
-git push -u origin main
-```
+Workflow: `.github/workflows/build-apk.yml` — trigger `push` ke `main` + manual `workflow_dispatch`.
 
----
+Langkah CI (Ubuntu, Java 17, Flutter stable 3.35.4, Gradle 8.13):
+1. Checkout + setup Java 17 + setup Gradle 8.13
+2. Setup Flutter `stable` → `flutter pub get`
+3. `dart format --set-exit-if-changed .` (check)
+4. `flutter analyze`
+5. `flutter test`
+6. `flutter build apk --release` — plus `with --dart-define` job bila Secrets `SUPABASE_URL`/`SUPABASE_ANON_KEY` ada
+7. `upload-artifact` — `edutask-release-apk` (`build/app/outputs/flutter-apk/app-release.apk`, ~29MB) + `build-log`
 
-## 🏗️ Cara Membangun APK via GitHub Actions
+**Download APK:**
+Repo → **Actions** → workflow **Build EduTask APK** hijau → **Artifacts** → `edutask-release-apk` → unzip → `app-release.apk` → install di Android (izinkan *Install from unknown sources* untuk Chrome/Files).
 
-Workflow sudah ada di `.github/workflows/build-apk.yml`.
-
-**Trigger:**
-- Push ke branch `main` → otomatis build
-- Atau manual: GitHub → **Actions** → **Build EduTask APK** → **Run workflow**
-
-**Langkah Build Lokal (opsional):**
+**Build lokal:**
 ```bash
 flutter build apk --release
-# atau dengan config
+# atau
 flutter build apk --release --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...
+# hasil: build/app/outputs/flutter-apk/app-release.apk
 ```
 
-**Unduh APK dari Actions:**
-1. Buka repository → **Actions**
-2. Pilih workflow **Build EduTask APK** yang sukses (centang hijau)
-3. Scroll ke **Artifacts** → **edutask-release-apk** → Download ZIP → Extract → `app-release.apk`
-4. Install di Android (izinkan "Install from unknown sources")
-
-**Release Signing (Produksi):**
-Jangan commit keystore. Buat keystore lokal:
+**Signing release (Play Store):**
+Jangan commit keystore. Buat lokal:
 ```bash
 keytool -genkey -v -keystore upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
 ```
-Buat `android/key.properties` (gitignore):
+Buat `android/key.properties` (sudah di `.gitignore`):
 ```
 storeFile=upload-keystore.jks
 storePassword=xxx
 keyAlias=upload
 keyPassword=xxx
 ```
-Untuk CI, simpan sebagai **GitHub Secrets**: `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`, lalu decode di workflow sebelum build.
+Untuk CI: simpan `KEYSTORE_BASE64` (`base64 -w 0 upload-keystore.jks`), `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` sebagai **GitHub Secrets** lalu decode sebelum build di workflow.
+
+> APK debug/release tanpa keystore production tetap **bisa install** (pakai `signingConfig debug` sebagai fallback) — sudah dibuktikan build CI 29MB sukses. Untuk Play Store wajib signing upload key.
 
 ---
 
-## 🔐 Cara Menambahkan GitHub Secrets (jika perlu)
+## 🔐 Cara Tambah GitHub Secrets (opsional)
 
 Repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**:
-- `SUPABASE_URL` — untuk build yang butuh env (opsional, karena --dart-define)
-- `KEYSTORE_BASE64` — `base64 -w 0 upload-keystore.jks`
-- Dll.
+- `SUPABASE_URL` — dipakai job build *with* Secrets
+- `SUPABASE_ANON_KEY`
+- `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` — untuk signing produksi
 
-> APK debug/release tanpa signing tetap bisa diinstall untuk testing. Untuk Play Store, wajib signing.
+Tanpa secrets, job *without* secrets tetap build demo APK (tidak error `SUPABASE_* not set`).
 
 ---
 
 ## 🔔 Notifikasi Tenggat
 
-- Indikator warna otomatis: hijau (selesai), oranye (<24 jam), merah (terlambat)
-- Sisa waktu `relativeDeadline()` dengan zona Asia/Jakarta
-- **Notifikasi lokal** via `flutter_local_notifications`:
-  - Dijadwalkan 24 jam & 1 jam sebelum tenggat
-  - Permission Android: `POST_NOTIFICATIONS`, `SCHEDULE_EXACT_ALARM`, `USE_EXACT_ALARM`, `RECEIVE_BOOT_COMPLETED`
-  - Panggil `NotificationService.scheduleForTugas(tugas)` setelah buat tugas
-  - **Catatan:** Notifikasi terjadwal butuh app pernah dibuka & permission granted. Tidak 100% guaranteed jika battery optimization agresif — test di device fisik.
+- Warna deadline otomatis (`DeadlineHelper` + `AppDateUtils`):
+  - 🟢 `success` — tugas sudah ditandai selesai
+  - 🟠 `warning` — tenggat <24 jam (`deadlineWarningHours = 24`)
+  - 🔴 `error` — sudah lewat tenggat
+  - 🔵 `primary` — masih aktif
+- `AppDateUtils.nowJakarta()` & `toJakarta()` pakai `timezone` `Asia/Jakarta` — aman meski device di zona lain
+- Notifikasi lokal via `flutter_local_notifications` (`NotificationService.scheduleForTugas`):
+  - Trigger 24 jam & 1 jam sebelum tenggat
+  - Permission Android: `POST_NOTIFICATIONS` (runtime Android 13+), `SCHEDULE_EXACT_ALARM` + `USE_EXACT_ALARM` (Android 12+), `RECEIVE_BOOT_COMPLETED` — sudah di `AndroidManifest.xml`
+  - Permission runtime diminta pakai `permission_handler`/`flutter_local_notifications` request — jika ditolak, tampil penjelasan, tidak FC
+  - **Catatan:** butuh app pernah dibuka & izin diberikan; tidak 100% terjamin bila battery optimization agresif — test di device fisik, bukan emulator.
 
 ---
 
 ## 🛡️ Keamanan
 
-- **Tidak ada service_role key di APK** — hanya anon key (publishable) via `--dart-define`
-- RLS aktif di semua tabel, role diverifikasi server (`profiles.role`), bukan dari client
-- Siswa anonim hanya `SELECT` jadwal/tugas published & daftar kelas
-- Status tugas siswa hanya via Edge Function + validasi kode_akses & kecocokan kelas
-- Fallback lokal (SharedPreferences) dijelaskan tidak resmi
-- Konfirmasi dialog sebelum hapus, validasi input lengkap
+- **Tidak ada `service_role` di APK** — hanya `anonKey` via `--dart-define` (aman di `SupabaseConfig.fromEnvironment`)
+- RLS aktif di semua tabel; `profiles.role` diverifikasi server, bukan dari client
+- Siswa anon hanya `SELECT` jadwal/tugas `published` + daftar kelas/mapel; tidak bisa insert/update langsung
+- Status tugas via Edge Function + validasi `kode_akses` + kecocokan `kelas_id` + token akses; fallback lokal dijelaskan sebagai *tidak resmi*
+- `SupabaseService`: `isReady`, `tryClient`, `tryAuth`, `currentUser`, `isLoggedIn`, `signOut()` — tidak throw bila belum ready; `client` getter throw dengan pesan jelas bila lupa guard
+- `main.dart` + semua repository method sudah `try/catch` — error tampil `ErrorState`/`SnackBar`, bukan force close
 
 ---
 
@@ -249,46 +274,66 @@ Repo → **Settings** → **Secrets and variables** → **Actions** → **New re
 
 ```
 lib/
-  main.dart, app.dart
-  core/{config,constants,errors,routing,theme,utils,widgets}
-  features/{auth,admin,teacher,student,notifications}
-  shared/{models,repositories,services}
+  main.dart                         # guard tz/intl/supabase/notification + FlutterError
+  app.dart                          # MaterialApp.router + GoRouter (splash→login/admin/guru, siswa publik)
+  core/
+    config/supabase_config.dart     # isConfigured/isNotConfigured, dart-define
+    config/app_constants.dart
+    constants/app_colors.dart        # biru utama (#0D47A1), hijau/oranye/merah status
+    constants/app_theme.dart         # Material3, card bulat (16), bottomNav, drawer
+    routing/app_router.dart
+    utils/{date_utils,deadline_helper,validators,file_utils}.dart
+    widgets/{app_banner,empty_state,loading_view,status_chip,confirm_dialog}.dart
+  features/
+    auth/{data,presentation}        # login, auth_provider, role redirect
+    admin/presentation/pages/*      # dashboard, students, teachers, classes, subjects, schedules, tasks, reports
+    teacher/presentation/pages/*    # dashboard, schedules, tasks, task_form, task_status
+    student/{presentation,identity} # main, schedule, task_list, task_detail, identity (kode)
+    notifications/notification_service.dart
+  shared/
+    models/{kelas,siswa,jadwal,mata_pelajaran,tugas,status_tugas}.dart
+    repositories/{kelas,siswa,jadwal,mapel,tugas}_repository.dart
+    services/supabase_service.dart
 supabase/
-  migrations/001_initial_schema.sql
-  functions/{create-teacher,student-access,update-student-task-status}
+  migrations/001_initial_schema.sql  # 8+ tabel + RLS + trigger
+  functions/{create-teacher,student-access,update-student-task-status}/index.ts
 .github/workflows/build-apk.yml
-android/
-assets/
-test/
+android/                            # compileSdk 36, mipmap icons dari logo
+assets/images/{edutask_logo.png,edutask_banner.png}
+test/                               # deadline, date, role, RLS, akses publik
 ```
 
 ---
 
-## 🐛 Troubleshooting
+## 🐛 Troubleshooting Lengkap
 
 | Masalah | Solusi |
 |---|---|
-| `Supabase belum dikonfigurasi` | Jalankan dengan `--dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...` |
-| `Failed host lookup` / Tidak ada koneksi | Cek internet, cek URL Supabase |
-| Login gagal `Invalid login credentials` | Pastikan user ada di Auth & profiles.role terisi admin/guru & is_active=true |
-| Undang guru gagal | Pastikan Edge Function `create-teacher` sudah deploy & secrets terisi |
-| Jadwal bentrok error | Aturan DB mencegah overlap kelas/guru di hari & jam sama — ubah jam/ruang |
-| Upload lampiran gagal | Pastikan bucket `lampiran-tugas` public & policy insert untuk authenticated |
-| Build APK gagal `Java version` | Gunakan Java 17 (Temurin) sesuai AGP 8.3.0 |
-| Notifikasi tidak muncul | Cek permission POST_NOTIFICATIONS & battery optimization, test di device fisik |
-| `flutter analyze` error | `flutter pub get` & pastikan SDK ≥3.4.0 |
+| `Supabase belum dikonfigurasi` / data kosong | Jalankan dengan `--dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...`. Cek `lib/core/config/supabase_config.dart`. |
+| `Failed host lookup` / tidak ada koneksi | Cek internet & URL `https://...supabase.co` (tanpa trailing slash). |
+| Login gagal `Invalid login credentials` | Pastikan user ada di **Auth → Users** DAN ada baris di `profiles` dengan `role` `admin`/`guru` & `is_active=true`. |
+| `force close` saat buka halaman siswa | Sudah di-fix: semua repository `return []` bila `!isReady`, UI `try/catch`. Jika masih, cek `flutter analyze` & laporkan log `adb logcat`. |
+| Undang guru gagal | Deploy Edge Function `create-teacher` + isi Secrets `SUPABASE_SERVICE_ROLE_KEY`. Tanpa itu, fallback tampil error jelas. |
+| Jadwal bentrok | Constraint DB mencegah overlap kelas/guru di hari & jam sama — ubah jam atau ruang. |
+| Upload lampiran gagal `bucket not found` | Buat bucket `lampiran-tugas` public + policy `insert` untuk `authenticated`. |
+| `There was a problem parsing the package` saat install APK | Android 12+ wajib `android:exported="true"` pada activity dengan intent-filter — sudah di `AndroidManifest.xml`. Juga cek *Install unknown apps* diizinkan untuk Chrome/Files di **Settings → Apps → Special access**. Uninstall APK debug lama jika ganti signature. |
+| `INSTALL_FAILED_NO_MATCHING_ABIS` | Build default arm64; test di device arm64/x86_64. Emulator x86 murni tidak support release APK. |
+| `Build APK gagal: Java version` | Pakai **Java 17** (Temurin) — AGP 8.11.1 + Gradle 8.13 butuh Java 17, bukan 8/11/21. |
+| `kernel_snapshot failed: No such file supabase_config.dart` | Path import harus `../../../core/config/supabase_config.dart` (3 level dari `features/auth/presentation`) — sudah fix di commit `815949b`. |
+| `mipmap ic_launcher broken` | Sudah regenerate 5 density PNG dari `edutask_logo.png` (bukan 68B placeholder). |
+| Notifikasi tidak muncul | Cek permission `POST_NOTIFICATIONS` (Android 13+) di Settings → Apps → EduTask → Notifications → Allow. Test di device fisik (banyak emulator matikan alarm). |
 
 ---
 
 ## 📄 Lisensi
 
-MIT — Bebas digunakan untuk pendidikan.
-
----
+MIT — bebas dipakai untuk pendidikan.
 
 ## 🤝 Kontribusi
 
-PR Welcome! Pastikan `flutter analyze` & `flutter test` hijau sebelum PR.
+PR welcome! Pastikan `flutter analyze` & `flutter test` hijau sebelum PR.
 
-''Terima kasih khusus kepada PALL atas kerja keras mereka yang luar biasa dalam mengembangkan aplikasi ini. Mulai dari penulisan kode yang rapi hingga eksekusi desain UI/UX yang mulus, PALL telah terbukti menjadi tim pengembang yang sangat berharga dan memberikan keunggulan di setiap tahap.''
+---
+
+*Built with ❤️ by PALL — terima kasih atas dedikasi dari kode rapi sampai eksekusi UI/UX yang mulus.*
 
