@@ -52,10 +52,10 @@ jobs:
           set -o pipefail
           if [ -n "${{ secrets.SUPABASE_URL }}" ] && [ -n "${{ secrets.SUPABASE_ANON_KEY }}" ]; then
             echo "Building dengan Supabase Secrets..."
-            flutter build apk --release --verbose --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} 2>&1 | tee build-apk.log
+            flutter build apk --release --android-skip-build-dependency-validation --verbose --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} 2>&1 | tee build-apk.log
           else
             echo "Secrets belum di-set, build mode demo..."
-            flutter build apk --release --verbose 2>&1 | tee build-apk.log
+            flutter build apk --release --android-skip-build-dependency-validation --verbose 2>&1 | tee build-apk.log
           fi
 
       - name: Upload build log (always)
