@@ -11,12 +11,21 @@ class NotificationService {
 
   static Future<void> init() async {
     if (_initialized) return;
-    tz_data.initializeTimeZones();
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosInit = DarwinInitializationSettings();
-    const initSettings = InitializationSettings(android: androidInit, iOS: iosInit);
-    await _plugin.initialize(initSettings);
-    _initialized = true;
+    try {
+      // Sudah diinit di main, tapi jaga-jaga jika dipanggil standalone
+      try {
+        tz_data.initializeTimeZones();
+      } catch (_) {}
+      const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const iosInit = DarwinInitializationSettings();
+      const initSettings = InitializationSettings(android: androidInit, iOS: iosInit);
+      await _plugin.initialize(initSettings);
+      _initialized = true;
+    } catch (e, s) {
+      debugPrint('NotificationService.init gagal: $e $s');
+      // Tandai sudah init agar tidak loop retry terus
+      _initialized = true;
+    }
   }
 
   static Future<void> requestPermission() async {

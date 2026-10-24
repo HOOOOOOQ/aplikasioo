@@ -31,6 +31,16 @@ class Jadwal extends Equatable {
     required this.updatedAt,
   });
 
+  static DateTime _parseDt(dynamic v) {
+    if (v == null) return DateTime.now();
+    try {
+      if (v is DateTime) return v;
+      return DateTime.parse(v as String);
+    } catch (_) {
+      return DateTime.now();
+    }
+  }
+
   factory Jadwal.fromJson(Map<String, dynamic> json) {
     String? kelasNama;
     if (json['kelas'] != null && json['kelas'] is Map) kelasNama = (json['kelas'] as Map)['nama_kelas'] as String?;
@@ -41,19 +51,19 @@ class Jadwal extends Equatable {
     if (json['mata_pelajaran'] != null && json['mata_pelajaran'] is Map) mapelNama = (json['mata_pelajaran'] as Map)['nama_mapel'] as String?;
 
     return Jadwal(
-      id: json['id'] as String,
-      kelasId: json['kelas_id'] as String,
+      id: json['id'] as String? ?? '',
+      kelasId: json['kelas_id'] as String? ?? '',
       kelasNama: kelasNama,
-      guruId: json['guru_id'] as String,
+      guruId: json['guru_id'] as String? ?? '',
       guruNama: guruNama,
-      mataPelajaranId: json['mata_pelajaran_id'] as String,
+      mataPelajaranId: json['mata_pelajaran_id'] as String? ?? '',
       mataPelajaranNama: mapelNama,
-      hari: json['hari'] as String,
-      jamMulai: json['jam_mulai'] as String,
-      jamSelesai: json['jam_selesai'] as String,
+      hari: json['hari'] as String? ?? 'Senin',
+      jamMulai: json['jam_mulai'] as String? ?? '07:00',
+      jamSelesai: json['jam_selesai'] as String? ?? '08:00',
       ruang: json['ruang'] as String?,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: _parseDt(json['created_at']),
+      updatedAt: _parseDt(json['updated_at']),
     );
   }
 

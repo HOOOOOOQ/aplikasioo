@@ -24,7 +24,7 @@ class SupabaseConfig {
   static void debugPrintConfig() {
     if (kDebugMode) {
       debugPrint('[SupabaseConfig] URL: ${supabaseUrl.isEmpty ? "(kosong)" : supabaseUrl}');
-      debugPrint('[SupabaseConfig] AnonKey: ${supabaseAnonKey.isEmpty ? "(kosong)" : "${supabaseAnonKey.substring(0, 10)}..."}');
+      debugPrint('[SupabaseConfig] AnonKey: ${supabaseAnonKey.isEmpty ? "(kosong)" : "${supabaseAnonKey.length >= 10 ? supabaseAnonKey.substring(0, 10) : supabaseAnonKey}..."}');
       debugPrint('[SupabaseConfig] isConfigured: $isConfigured');
     }
   }

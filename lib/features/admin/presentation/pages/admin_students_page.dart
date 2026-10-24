@@ -164,7 +164,7 @@ class _AdminStudentsPageState extends ConsumerState<AdminStudentsPage> {
                               final s = _list[i];
                               return Card(
                                 child: ListTile(
-                                  leading: CircleAvatar(backgroundColor: AppColors.primaryContainer, child: Text(s.nama.substring(0, 1).toUpperCase(), style: const TextStyle(color: AppColors.primary))),
+                                  leading: CircleAvatar(backgroundColor: AppColors.primaryContainer, child: Text(s.nama.isNotEmpty ? s.nama[0].toUpperCase() : '?', style: const TextStyle(color: AppColors.primary))),
                                   title: Text(s.nama, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                                   subtitle: Text('${s.nomorInduk} • ${s.kelasNama ?? "-"}', style: const TextStyle(fontSize: 12)),
                                   trailing: PopupMenuButton(

@@ -14,11 +14,14 @@ class MataPelajaran extends Equatable {
   });
 
   factory MataPelajaran.fromJson(Map<String, dynamic> json) {
+    DateTime parseDt(dynamic v) {
+      try { return DateTime.parse(v as String); } catch (_) { return DateTime.now(); }
+    }
     return MataPelajaran(
-      id: json['id'] as String,
-      namaMapel: json['nama_mapel'] as String,
+      id: json['id'] as String? ?? '',
+      namaMapel: json['nama_mapel'] as String? ?? '-',
       deskripsi: json['deskripsi'] as String?,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: parseDt(json['created_at']),
     );
   }
 

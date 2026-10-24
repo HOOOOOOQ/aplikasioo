@@ -23,21 +23,31 @@ class Siswa extends Equatable {
     required this.updatedAt,
   });
 
+  static DateTime _parseDt(dynamic v) {
+    if (v == null) return DateTime.now();
+    try {
+      if (v is DateTime) return v;
+      return DateTime.parse(v as String);
+    } catch (_) {
+      return DateTime.now();
+    }
+  }
+
   factory Siswa.fromJson(Map<String, dynamic> json) {
     String? kelasNama;
     if (json['kelas'] != null && json['kelas'] is Map) {
       kelasNama = (json['kelas'] as Map)['nama_kelas'] as String?;
     }
     return Siswa(
-      id: json['id'] as String,
-      nomorInduk: json['nomor_induk'] as String,
-      nama: json['nama'] as String,
+      id: json['id'] as String? ?? '',
+      nomorInduk: json['nomor_induk'] as String? ?? '-',
+      nama: json['nama'] as String? ?? '-',
       kelasId: json['kelas_id'] as String?,
       kelasNama: kelasNama,
       kodeAkses: json['kode_akses'] as String?,
       statusAktif: json['status_aktif'] as bool? ?? true,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: _parseDt(json['created_at']),
+      updatedAt: _parseDt(json['updated_at']),
     );
   }
 

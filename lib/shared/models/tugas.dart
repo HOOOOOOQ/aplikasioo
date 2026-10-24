@@ -41,6 +41,16 @@ class Tugas extends Equatable {
     this.selesaiPada,
   });
 
+  static DateTime _parseDt(dynamic v, {DateTime? fallback}) {
+    if (v == null) return fallback ?? DateTime.now();
+    try {
+      if (v is DateTime) return v;
+      return DateTime.parse(v as String);
+    } catch (_) {
+      return fallback ?? DateTime.now();
+    }
+  }
+
   factory Tugas.fromJson(Map<String, dynamic> json) {
     String? guruNama;
     if (json['guru'] != null && json['guru'] is Map) guruNama = (json['guru'] as Map)['full_name'] as String?;
@@ -53,31 +63,33 @@ class Tugas extends Equatable {
     // Join for status
     String? statusSiswa;
     DateTime? selesaiPada;
-    if (json['status_tugas_siswa'] != null && json['status_tugas_siswa'] is List && (json['status_tugas_siswa'] as List).isNotEmpty) {
-      final s = (json['status_tugas_siswa'] as List).first as Map<String, dynamic>;
-      statusSiswa = s['status'] as String?;
-      if (s['selesai_pada'] != null) selesaiPada = DateTime.parse(s['selesai_pada'] as String);
-    } else if (json['status'] != null) {
-      statusSiswa = json['status'] as String?;
-      if (json['selesai_pada'] != null) selesaiPada = DateTime.parse(json['selesai_pada'] as String);
-    }
+    try {
+      if (json['status_tugas_siswa'] != null && json['status_tugas_siswa'] is List && (json['status_tugas_siswa'] as List).isNotEmpty) {
+        final s = (json['status_tugas_siswa'] as List).first as Map<String, dynamic>;
+        statusSiswa = s['status'] as String?;
+        if (s['selesai_pada'] != null) selesaiPada = _parseDt(s['selesai_pada']);
+      } else if (json['status'] != null) {
+        statusSiswa = json['status'] as String?;
+        if (json['selesai_pada'] != null) selesaiPada = _parseDt(json['selesai_pada']);
+      }
+    } catch (_) {}
 
     return Tugas(
-      id: json['id'] as String,
-      judul: json['judul'] as String,
-      deskripsi: json['deskripsi'] as String,
-      guruId: json['guru_id'] as String,
+      id: json['id'] as String? ?? '',
+      judul: json['judul'] as String? ?? '-',
+      deskripsi: json['deskripsi'] as String? ?? '',
+      guruId: json['guru_id'] as String? ?? '',
       guruNama: guruNama,
-      kelasId: json['kelas_id'] as String,
+      kelasId: json['kelas_id'] as String? ?? '',
       kelasNama: kelasNama,
-      mataPelajaranId: json['mata_pelajaran_id'] as String,
+      mataPelajaranId: json['mata_pelajaran_id'] as String? ?? '',
       mataPelajaranNama: mapelNama,
-      tanggalMulai: DateTime.parse(json['tanggal_mulai'] as String),
-      tenggatWaktu: DateTime.parse(json['tenggat_waktu'] as String),
+      tanggalMulai: _parseDt(json['tanggal_mulai']),
+      tenggatWaktu: _parseDt(json['tenggat_waktu']),
       lampiranPath: json['lampiran_path'] as String?,
       statusPublikasi: json['status_publikasi'] as String? ?? 'published',
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: _parseDt(json['created_at']),
+      updatedAt: _parseDt(json['updated_at']),
       statusSiswa: statusSiswa,
       selesaiPada: selesaiPada,
     );
