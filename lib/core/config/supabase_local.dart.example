@@ -1,0 +1,10 @@
+// CONTOH config lokal (jangan commit file aslinya).
+// Copy file ini -> supabase_local.dart lalu isi dengan URL & anon key kamu.
+// File supabase_local.dart sudah di .gitignore.
+
+/*
+class SupabaseLocalConfig {
+  static const url = 'https://xxx.supabase.co';
+  static const anonKey = 'sb_publishable_xxx';
+}
+*/

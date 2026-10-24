@@ -41,8 +41,19 @@ jobs:
       - name: Run tests
         run: flutter test
 
+      # Build APK - otomatis pakai Secrets jika kamu sudah set di GitHub
+      # Cara set: Repo Settings -> Secrets and variables -> Actions -> New repository secret
+      # Tambah: SUPABASE_URL dan SUPABASE_ANON_KEY (isi sb_publishable_...)
+      # Jika belum set, build tetap jalan tapi app jadi mode demo (tanpa data)
       - name: Build release APK
-        run: flutter build apk --release
+        run: |
+          if [ -n "${{ secrets.SUPABASE_URL }}" ] && [ -n "${{ secrets.SUPABASE_ANON_KEY }}" ]; then
+            echo "Building dengan Supabase Secrets..."
+            flutter build apk --release --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          else
+            echo "Secrets belum di-set, build mode demo..."
+            flutter build apk --release
+          fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
