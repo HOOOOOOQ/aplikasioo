@@ -290,5 +290,5 @@ MIT — Bebas digunakan untuk pendidikan.
 
 PR Welcome! Pastikan `flutter analyze` & `flutter test` hijau sebelum PR.
 
-```
+`SPESIAL THANKS TO PALL`
 
