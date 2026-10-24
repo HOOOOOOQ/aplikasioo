@@ -90,12 +90,22 @@ jobs:
             const fs = require('fs');
             let log = '';
             try { log = fs.readFileSync('build-apk.log', 'utf8'); } catch(e) { log = 'no log file ' + e; }
-            // Ambil bagian penting: What went wrong + stack, lalu tail
+            // Cari error Dart/Flutter sebelum What went wrong (mis: Target kernel_snapshot failed / Error: )
+            let dartErr = '';
+            const markers = ['Failed to compile','kernel_snapshot','Error:','error:','Target '];
+            for (const m of markers) {
+              const i = log.indexOf(m);
+              if (i >= 0) { dartErr = log.slice(Math.max(0,i-2000), i+4000); break; }
+            }
             let snippet = '';
             const wIdx = log.indexOf('* What went wrong');
-            if (wIdx >= 0) snippet = log.slice(wIdx, wIdx + 6000);
-            const tail = log.slice(-6000);
-            const combined = snippet ? snippet + '\n\n---TAIL---\n\n' + tail : tail;
+            if (wIdx >= 0) snippet = log.slice(wIdx, wIdx + 4000);
+            const tail = log.slice(-5000);
+            const parts = [];
+            if (dartErr) parts.push('---DART ERROR---\n' + dartErr);
+            if (snippet) parts.push('---GRADLE What went wrong---\n' + snippet);
+            parts.push('---TAIL---\n' + tail);
+            const combined = parts.join('\n\n');
             const title = `Build APK gagal #${context.runId}`;
             const body = `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\nTail log (6000 chars):\n\n\`\`\`\n${combined}\n\`\`\``;
             await github.rest.issues.create({
@@ -109,8 +119,10 @@ jobs:
       - name: Append log to job summary (always)
         if: always()
         run: |
-          echo "### Build log — What went wrong + tail" >> $GITHUB_STEP_SUMMARY
+          echo "### Build log — Dart error + What went wrong + tail" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -m1 -B5 -A20 "Failed to compile\|kernel_snapshot\|Error:" build-apk.log | head -80 >> $GITHUB_STEP_SUMMARY || echo "no dart error found" >> $GITHUB_STEP_SUMMARY
+          echo "---What went wrong---" >> $GITHUB_STEP_SUMMARY
           grep -A 30 "What went wrong" build-apk.log >> $GITHUB_STEP_SUMMARY || true
           echo "---TAIL---" >> $GITHUB_STEP_SUMMARY
           tail -c 4000 build-apk.log >> $GITHUB_STEP_SUMMARY || echo "no log" >> $GITHUB_STEP_SUMMARY
