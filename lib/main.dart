@@ -18,7 +18,7 @@ void main() async {
       await Supabase.initialize(
         url: SupabaseConfig.supabaseUrl,
         // publishableKey = nama baru untuk anonKey di supabase_flutter >=2.8
-        anonKey: SupabaseConfig.supabaseAnonKey,
+        publishableKey: SupabaseConfig.supabaseAnonKey,
       );
       // Notification permission
       await NotificationService.init();
