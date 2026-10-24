@@ -24,12 +24,13 @@ if (flutterVersionName == null) {
 
 android {
     namespace "com.edutask.sekolah"
-    compileSdk 34
+    compileSdk 36
     ndkVersion flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled true
     }
 
     kotlinOptions {
@@ -43,7 +44,7 @@ android {
     defaultConfig {
         applicationId "com.edutask.sekolah"
         minSdk 21
-        targetSdk 34
+        targetSdk 36
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         multiDexEnabled true
@@ -62,4 +63,6 @@ flutter {
     source '../..'
 }
 
-dependencies {}
+dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
+}
