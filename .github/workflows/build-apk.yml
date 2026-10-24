@@ -67,22 +67,23 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-      - name: Comment build log on failure
+      - name: Create Gist with build log on failure
         if: failure()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            let log = '';
-            try { log = fs.readFileSync('build-apk.log', 'utf8').slice(-8000); } catch(e) { log = 'no log file: '+e; }
-            const body = `❌ Build APK gagal. Tail log (8000 chars):\n\n\`\`\`\n${log}\n\`\`\``;
-            github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number || 0,
-              body: body
-            }).catch(e=>console.log('comment fail',e));
-            core.summary.addRaw(body).write();
+        run: |
+          echo "Creating gist for debug..."
+          tail -c 8000 build-apk.log > /tmp/tail.log || echo "no log" > /tmp/tail.log
+          CONTENT=$(cat /tmp/tail.log | jq -Rs .)
+          curl -s -X POST https://api.github.com/gists \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            -d "{\"public\": false, \"files\": {\"build-log.txt\": {\"content\": $CONTENT}}, \"description\": \"EduTask build log ${{ github.run_id }}\"}" | tee /tmp/gist.json
+          GIST_URL=$(jq -r .html_url /tmp/gist.json)
+          echo "Gist: $GIST_URL"
+          echo "### ❌ Build gagal - log: $GIST_URL" >> $GITHUB_STEP_SUMMARY
+          echo "Tail log:" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat /tmp/tail.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
