@@ -6,6 +6,7 @@ import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/widgets/loading_view.dart';
 import '../../../../shared/models/jadwal.dart';
+import '../../../../shared/models/kelas.dart';
 import '../../../../shared/repositories/jadwal_repository.dart';
 import '../../../../shared/repositories/kelas_repository.dart';
 import '../../../../shared/repositories/mapel_repository.dart';
