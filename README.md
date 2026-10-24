@@ -290,5 +290,5 @@ MIT — Bebas digunakan untuk pendidikan.
 
 PR Welcome! Pastikan `flutter analyze` & `flutter test` hijau sebelum PR.
 
-`SPESIAL THANKS TO PALL`
+''Terima kasih khusus kepada PALL atas kerja keras mereka yang luar biasa dalam mengembangkan aplikasi ini. Mulai dari penulisan kode yang rapi hingga eksekusi desain UI/UX yang mulus, PALL telah terbukti menjadi tim pengembang yang sangat berharga dan memberikan keunggulan di setiap tahap.''
 
