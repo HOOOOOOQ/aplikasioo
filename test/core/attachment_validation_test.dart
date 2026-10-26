@@ -36,12 +36,12 @@ void main() {
     });
 
     test('menolak file melebihi batas', () {
-      final tooBig = AppConstants.maxAttachmentSizeMb * 1024 * 1024 + 1;
+      const tooBig = AppConstants.maxAttachmentSizeMb * 1024 * 1024 + 1;
       expect(AttachmentService.validate(fileName: 'a.pdf', sizeBytes: tooBig), isNotNull);
     });
 
     test('menerima tepat pada batas ukuran', () {
-      final limit = AppConstants.maxAttachmentSizeMb * 1024 * 1024;
+      const limit = AppConstants.maxAttachmentSizeMb * 1024 * 1024;
       expect(AttachmentService.validate(fileName: 'a.pdf', sizeBytes: limit), isNull);
     });
 

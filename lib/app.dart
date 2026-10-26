@@ -26,7 +26,6 @@ class EduTaskApp extends ConsumerWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      scrollBehavior: const _AppScrollBehavior(),
       builder: (context, child) {
         final safeChild = child ?? const SizedBox.shrink();
 
@@ -68,12 +67,3 @@ class EduTaskApp extends ConsumerWidget {
   }
 }
 
-class _AppScrollBehavior extends MaterialScrollBehavior {
-  const _AppScrollBehavior();
-
-  @override
-  Widget buildViewportChrome(BuildContext context, Widget child, AxisDirection axisDirection) {
-    // Hindari glow berlebihan di Android; tetap mendukung tarik-untuk-refresh.
-    return child;
-  }
-}

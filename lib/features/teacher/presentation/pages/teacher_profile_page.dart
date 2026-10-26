@@ -9,6 +9,7 @@ import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/app_states.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../auth/presentation/auth_provider.dart';
+import '../../../auth/domain/app_user.dart';
 
 class TeacherProfilePage extends ConsumerWidget {
   const TeacherProfilePage({super.key});

@@ -14,6 +14,7 @@ import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../auth/presentation/auth_provider.dart';
 import '../../../notifications/notification_service.dart';
 import '../../../student/identity/student_identity_provider.dart';
+import '../../../auth/domain/app_user.dart';
 
 class AdminSettingsPage extends ConsumerWidget {
   const AdminSettingsPage({super.key});

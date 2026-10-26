@@ -35,8 +35,6 @@ class TeacherShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final path = GoRouterState.of(context).uri.path;
-    final user = ref.watch(currentUserProvider).valueOrNull;
-
     final routes = ['/guru', '/guru/jadwal', '/guru/tugas', '/guru/kode-akses', '/guru/profil'];
     var index = routes.indexOf(path);
     if (index < 0) index = 0;

@@ -151,7 +151,7 @@ class _StudentMainPageState extends ConsumerState<StudentMainPage> {
                 children: [
                   const SizedBox(height: AppSpacing.xl),
                   AppHeroHeader(
-                    eyebrow: '${hariIni}, ${AppDateUtils.formatTanggal(now)}',
+                    eyebrow: '$hariIni, ${AppDateUtils.formatTanggal(now)}',
                     title: 'Selamat datang',
                     subtitle: 'Belum ada data kelas dari sekolah.',
                   ),
@@ -182,7 +182,7 @@ class _StudentMainPageState extends ConsumerState<StudentMainPage> {
               padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.xxl),
               children: [
                 AppHeroHeader(
-                  eyebrow: '${hariIni}, ${AppDateUtils.formatTanggal(now)}',
+                  eyebrow: '$hariIni, ${AppDateUtils.formatTanggal(now)}',
                   title: identity.isIdentified
                       ? 'Halo, ${identity.siswaNama ?? 'Siswa'}'
                       : 'Halo, Sobat EduTask',
