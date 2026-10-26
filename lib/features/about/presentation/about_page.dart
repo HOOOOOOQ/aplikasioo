@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/config/app_info.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/app_version.dart';
 import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/confirm_dialog.dart';
@@ -57,6 +58,11 @@ class AboutPage extends StatelessWidget {
                 const _FeatureRow(icon: Icons.assignment_rounded, text: 'Tugas, lampiran, dan pengingat tenggat'),
                 const _FeatureRow(icon: Icons.verified_user_rounded, text: 'Kode akses siswa untuk status tugas resmi'),
                 const _FeatureRow(icon: Icons.insights_rounded, text: 'Laporan penyelesaian tugas untuk guru & admin'),
+                const _FeatureRow(icon: Icons.upload_file_rounded, text: 'Pengumpulan jawaban siswa, nilai, dan umpan balik guru'),
+                const _FeatureRow(icon: Icons.forum_rounded, text: 'Chat privat dengan guru dan grup kelas'),
+                const _FeatureRow(icon: Icons.campaign_rounded, text: 'Pengumuman sekolah dan kalender akademik'),
+                const _FeatureRow(icon: Icons.notifications_rounded, text: 'Pusat notifikasi dengan status sudah dibaca'),
+                const _FeatureRow(icon: Icons.search_rounded, text: 'Pencarian tugas, kelas, guru, dan pengumuman'),
                 const SizedBox(height: AppSpacing.md),
                 Text(
                   AppInfo.privacyNote,
@@ -219,9 +225,10 @@ class AboutPage extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.16),
               borderRadius: BorderRadius.circular(999),
             ),
-            child: Text(
-              'Versi ${AppInfo.version} • ${AppInfo.packageName}',
-              style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600),
+            child: AppVersionLabel(
+              color: Colors.white,
+              fontSize: 11,
+              suffix: AppInfo.packageName,
             ),
           ),
         ],

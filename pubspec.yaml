@@ -34,6 +34,11 @@ dependencies:
   shimmer: ^3.0.0
   flutter_svg: ^2.0.10+1
   gap: ^3.0.1
+  # Suara pembuka (aset lokal). Versi dipilih otomatis oleh resolver agar
+  # tetap kompatibel dengan Flutter 3.35 yang dipakai CI.
+  audioplayers: ^6.1.0
+  # Versi & nomor build dibaca dari metadata APK (bukan hardcode).
+  package_info_plus: ^8.0.0
 
 dev_dependencies:
   flutter_test:
@@ -49,4 +54,5 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - assets/audio/
 

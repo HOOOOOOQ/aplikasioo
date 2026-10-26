@@ -23,6 +23,7 @@ import '../../features/onboarding/presentation/onboarding_page.dart';
 import '../../features/student/identity/student_identity_page.dart';
 import '../../features/student/presentation/pages/student_main_page.dart';
 import '../../features/student/presentation/pages/student_schedule_page.dart';
+import '../../features/student/presentation/pages/student_settings_page.dart';
 import '../../features/student/presentation/pages/student_task_detail_page.dart';
 import '../../features/student/presentation/pages/student_task_list_page.dart';
 import '../../features/teacher/presentation/pages/teacher_dashboard_page.dart';
@@ -32,6 +33,13 @@ import '../../features/teacher/presentation/pages/teacher_shell.dart';
 import '../../features/teacher/presentation/pages/teacher_task_form_page.dart';
 import '../../features/teacher/presentation/pages/teacher_task_status_page.dart';
 import '../../features/teacher/presentation/pages/teacher_tasks_page.dart';
+import '../../features/akademik/presentation/chat_room_page.dart';
+import '../../features/akademik/presentation/chat_threads_page.dart';
+import '../../features/akademik/presentation/kalender_page.dart';
+import '../../features/akademik/presentation/notifikasi_page.dart';
+import '../../features/akademik/presentation/pengumuman_page.dart';
+import '../../features/akademik/presentation/pencarian_page.dart';
+import '../navigation/back_guard.dart';
 import '../widgets/error_page.dart';
 import '../widgets/splash_page.dart';
 
@@ -40,6 +48,41 @@ import '../widgets/splash_page.dart';
 class _RouterRefresh extends ChangeNotifier {
   void ping() => notifyListeners();
 }
+
+/// Tab level atas untuk halaman siswa (dipakai kebijakan Back).
+const List<String> studentTabRoutes = [
+  '/siswa/jadwal',
+  '/siswa/tugas',
+  '/siswa/identitas',
+  '/siswa/pengumuman',
+  '/siswa/kalender',
+  '/siswa/chat',
+  '/siswa/notifikasi',
+  '/siswa/pengaturan',
+];
+
+/// Tab level atas untuk shell admin.
+const List<String> adminTabRoutes = [
+  '/admin/siswa',
+  '/admin/tugas',
+  '/admin/laporan',
+];
+
+/// Tab level atas untuk shell guru.
+const List<String> guruTabRoutes = [
+  '/guru/jadwal',
+  '/guru/tugas',
+  '/guru/kode-akses',
+  '/guru/profil',
+];
+
+/// Membungkus halaman siswa dengan kebijakan Back yang sama.
+Widget _siswaGuard(Widget child, {bool root = false}) => AppBackGuard(
+      homeRoute: '/siswa',
+      tabRoutes: studentTabRoutes,
+      confirmAtRoot: root,
+      child: child,
+    );
 
 String _homeFor(AppUser? user) {
   if (user == null || !user.isActive) return '/login';
@@ -104,9 +147,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
 
       // ---------- Siswa (tanpa login, sesuai desain awal aplikasi) ----------
-      GoRoute(path: '/siswa', builder: (ctx, s) => const StudentMainPage()),
-      GoRoute(path: '/siswa/jadwal', builder: (ctx, s) => const StudentSchedulePage()),
-      GoRoute(path: '/siswa/tugas', builder: (ctx, s) => const StudentTaskListPage()),
+      GoRoute(path: '/siswa', builder: (ctx, s) => _siswaGuard(const StudentMainPage(), root: true)),
+      GoRoute(path: '/siswa/jadwal', builder: (ctx, s) => _siswaGuard(const StudentSchedulePage())),
+      GoRoute(path: '/siswa/tugas', builder: (ctx, s) => _siswaGuard(const StudentTaskListPage())),
       GoRoute(
         path: '/siswa/tugas/:id',
         builder: (ctx, s) {
@@ -118,15 +161,61 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               fallbackRoute: '/siswa/tugas',
             );
           }
-          return StudentTaskDetailPage(taskId: id);
+          return _siswaGuard(StudentTaskDetailPage(taskId: id));
         },
       ),
-      GoRoute(path: '/siswa/tentang', builder: (ctx, s) => const AboutPage(fallbackRoute: '/siswa')),
-      GoRoute(path: '/siswa/identitas', builder: (ctx, s) => const StudentIdentityPage()),
+      GoRoute(
+        path: '/siswa/tentang',
+        builder: (ctx, s) => AppBackGuard(
+          homeRoute: '/siswa',
+          tabRoutes: studentTabRoutes,
+          child: const AboutPage(fallbackRoute: '/siswa'),
+        ),
+      ),
+      GoRoute(path: '/siswa/identitas', builder: (ctx, s) => _siswaGuard(const StudentIdentityPage())),
+      GoRoute(path: '/siswa/pengaturan', builder: (ctx, s) => _siswaGuard(const StudentSettingsPage())),
+
+      // ---------- Akademik siswa (pengumuman, kalender, chat, notifikasi) ----------
+      GoRoute(
+        path: '/siswa/pengumuman',
+        builder: (ctx, s) => _siswaGuard(const PengumumanPage(audience: AkademikAudience.siswa)),
+      ),
+      GoRoute(
+        path: '/siswa/kalender',
+        builder: (ctx, s) => _siswaGuard(const KalenderPage(audience: AkademikAudience.siswa)),
+      ),
+      GoRoute(
+        path: '/siswa/chat',
+        builder: (ctx, s) => _siswaGuard(const ChatThreadsPage(audience: AkademikAudience.siswa)),
+      ),
+      GoRoute(
+        path: '/siswa/chat/:id',
+        builder: (ctx, s) => _siswaGuard(
+          ChatRoomPage(
+            audience: AkademikAudience.siswa,
+            threadId: s.pathParameters['id'] ?? '',
+            initialTitle: s.uri.queryParameters['judul'],
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/siswa/notifikasi',
+        builder: (ctx, s) => _siswaGuard(const NotifikasiPage(audience: AkademikAudience.siswa)),
+      ),
+      GoRoute(
+        path: '/siswa/pencarian',
+        builder: (ctx, s) => _siswaGuard(const PencarianPage(audience: AkademikAudience.siswa)),
+      ),
 
       // ---------- Admin ----------
       ShellRoute(
-        builder: (context, state, child) => AdminShell(child: child),
+        builder: (context, state, child) => AppBackGuard(
+          homeRoute: '/admin',
+          tabRoutes: adminTabRoutes,
+          confirmAtRoot: true,
+          exitMessage: 'Anda berada di dashboard admin. Tekan "Keluar" untuk menutup aplikasi.',
+          child: AdminShell(child: child),
+        ),
         routes: [
           GoRoute(path: '/admin', builder: (ctx, s) => const AdminDashboardPage()),
           GoRoute(path: '/admin/siswa', builder: (ctx, s) => const AdminStudentsPage()),
@@ -160,6 +249,34 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/admin/audit', builder: (ctx, s) => const AdminAuditPage()),
           GoRoute(path: '/admin/pengaturan', builder: (ctx, s) => const AdminSettingsPage()),
           GoRoute(
+            path: '/admin/pengumuman',
+            builder: (ctx, s) => const PengumumanPage(audience: AkademikAudience.staff),
+          ),
+          GoRoute(
+            path: '/admin/kalender',
+            builder: (ctx, s) => const KalenderPage(audience: AkademikAudience.staff),
+          ),
+          GoRoute(
+            path: '/admin/chat',
+            builder: (ctx, s) => const ChatThreadsPage(audience: AkademikAudience.staff),
+          ),
+          GoRoute(
+            path: '/admin/chat/:id',
+            builder: (ctx, s) => ChatRoomPage(
+              audience: AkademikAudience.staff,
+              threadId: s.pathParameters['id'] ?? '',
+              initialTitle: s.uri.queryParameters['judul'],
+            ),
+          ),
+          GoRoute(
+            path: '/admin/notifikasi',
+            builder: (ctx, s) => const NotifikasiPage(audience: AkademikAudience.staff),
+          ),
+          GoRoute(
+            path: '/admin/pencarian',
+            builder: (ctx, s) => const PencarianPage(audience: AkademikAudience.staff),
+          ),
+          GoRoute(
             path: '/admin/tentang',
             builder: (ctx, s) => const AboutPage(fallbackRoute: '/admin'),
           ),
@@ -168,7 +285,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       // ---------- Guru ----------
       ShellRoute(
-        builder: (context, state, child) => TeacherShell(child: child),
+        builder: (context, state, child) => AppBackGuard(
+          homeRoute: '/guru',
+          tabRoutes: guruTabRoutes,
+          confirmAtRoot: true,
+          exitMessage: 'Anda berada di dashboard guru. Tekan "Keluar" untuk menutup aplikasi.',
+          child: TeacherShell(child: child),
+        ),
         routes: [
           GoRoute(path: '/guru', builder: (ctx, s) => const TeacherDashboardPage()),
           GoRoute(path: '/guru/jadwal', builder: (ctx, s) => const TeacherSchedulesPage()),
@@ -191,6 +314,34 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(path: '/guru/kode-akses', builder: (ctx, s) => const AccessCodesPage(isTeacher: true)),
           GoRoute(path: '/guru/profil', builder: (ctx, s) => const TeacherProfilePage()),
+          GoRoute(
+            path: '/guru/pengumuman',
+            builder: (ctx, s) => const PengumumanPage(audience: AkademikAudience.staff),
+          ),
+          GoRoute(
+            path: '/guru/kalender',
+            builder: (ctx, s) => const KalenderPage(audience: AkademikAudience.staff),
+          ),
+          GoRoute(
+            path: '/guru/chat',
+            builder: (ctx, s) => const ChatThreadsPage(audience: AkademikAudience.staff),
+          ),
+          GoRoute(
+            path: '/guru/chat/:id',
+            builder: (ctx, s) => ChatRoomPage(
+              audience: AkademikAudience.staff,
+              threadId: s.pathParameters['id'] ?? '',
+              initialTitle: s.uri.queryParameters['judul'],
+            ),
+          ),
+          GoRoute(
+            path: '/guru/notifikasi',
+            builder: (ctx, s) => const NotifikasiPage(audience: AkademikAudience.staff),
+          ),
+          GoRoute(
+            path: '/guru/pencarian',
+            builder: (ctx, s) => const PencarianPage(audience: AkademikAudience.staff),
+          ),
           GoRoute(
             path: '/guru/tentang',
             builder: (ctx, s) => const AboutPage(fallbackRoute: '/guru'),

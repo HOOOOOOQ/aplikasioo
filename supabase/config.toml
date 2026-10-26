@@ -21,3 +21,13 @@ verify_jwt = false
 # JWT diverifikasi gateway DAN dicek ulang terhadap profiles di dalam function.
 [functions.student-codes]
 verify_jwt = true
+
+# Portal siswa (pengumpulan tugas, diskusi, notifikasi siswa).
+# Tanpa JWT: otorisasi memakai token identitas siswa (HMAC) di dalam function.
+[functions.student-portal]
+verify_jwt = false
+
+# Chat siswa (daftar percakapan, kirim pesan, tandai dibaca).
+# Guru/admin memakai client Supabase langsung dengan RLS.
+[functions.student-chat]
+verify_jwt = false

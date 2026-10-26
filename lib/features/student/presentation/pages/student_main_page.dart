@@ -87,23 +87,63 @@ class _StudentMainPageState extends ConsumerState<StudentMainPage> {
         ),
         actions: [
           IconButton(
-            tooltip: 'Identitas siswa',
-            onPressed: () => context.push('/siswa/identitas'),
-            icon: Badge(
-              isLabelVisible: identity.isIdentified,
-              backgroundColor: AppColors.success,
-              smallSize: 8,
-              child: const Icon(Icons.badge_outlined),
-            ),
+            tooltip: 'Cari',
+            onPressed: () => context.go('/siswa/pencarian'),
+            icon: const Icon(Icons.search_rounded),
+          ),
+          IconButton(
+            tooltip: 'Notifikasi',
+            onPressed: () => context.go('/siswa/notifikasi'),
+            icon: const Icon(Icons.notifications_outlined),
+          ),
+          IconButton(
+            tooltip: 'Tentang aplikasi',
+            onPressed: () => context.push('/siswa/tentang'),
+            icon: const Icon(Icons.info_outline_rounded),
           ),
           PopupMenuButton<String>(
+            tooltip: 'Menu lainnya',
             onSelected: (value) {
-              if (value == 'about') context.push('/siswa/tentang');
-              if (value == 'login') context.push('/login');
+              switch (value) {
+                case 'identitas':
+                  context.go('/siswa/identitas');
+                case 'pengaturan':
+                  context.go('/siswa/pengaturan');
+                case 'login':
+                  context.push('/login');
+              }
             },
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: 'about', child: Text('Tentang EduTask')),
-              PopupMenuItem(value: 'login', child: Text('Masuk sebagai guru/admin')),
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'identitas',
+                child: Row(
+                  children: [
+                    const Icon(Icons.badge_outlined, size: 18),
+                    const SizedBox(width: 8),
+                    Text(identity.isIdentified ? 'Identitas terhubung' : 'Hubungkan identitas'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'pengaturan',
+                child: Row(
+                  children: [
+                    Icon(Icons.settings_outlined, size: 18),
+                    SizedBox(width: 8),
+                    Text('Pengaturan'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'login',
+                child: Row(
+                  children: [
+                    Icon(Icons.login_rounded, size: 18),
+                    SizedBox(width: 8),
+                    Text('Masuk sebagai guru/admin'),
+                  ],
+                ),
+              ),
             ],
           ),
         ],
@@ -119,7 +159,7 @@ class _StudentMainPageState extends ConsumerState<StudentMainPage> {
               context.go('/siswa/tugas');
               break;
             case 3:
-              context.push('/siswa/identitas');
+              context.go('/siswa/identitas');
               break;
           }
         },
@@ -389,15 +429,48 @@ class _StudentMainPageState extends ConsumerState<StudentMainPage> {
                   },
                 ),
                 const SizedBox(height: AppSpacing.xl),
+                const SectionHeader(title: 'Ruang belajar', icon: Icons.auto_stories_rounded),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () => context.go('/siswa/pengumuman'),
+                      icon: const Icon(Icons.campaign_outlined, size: 18),
+                      label: const Text('Pengumuman'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => context.go('/siswa/kalender'),
+                      icon: const Icon(Icons.event_outlined, size: 18),
+                      label: const Text('Kalender'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => context.go('/siswa/chat'),
+                      icon: const Icon(Icons.forum_outlined, size: 18),
+                      label: const Text('Chat'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => context.go('/siswa/notifikasi'),
+                      icon: const Icon(Icons.notifications_none_rounded, size: 18),
+                      label: const Text('Notifikasi'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xl),
                 const SectionHeader(title: 'Pintasan', icon: Icons.bolt_rounded),
                 Wrap(
                   spacing: AppSpacing.sm,
                   runSpacing: AppSpacing.sm,
                   children: [
                     OutlinedButton.icon(
-                      onPressed: () => context.push('/siswa/identitas'),
+                      onPressed: () => context.go('/siswa/identitas'),
                       icon: const Icon(Icons.badge_outlined, size: 18),
                       label: Text(identity.isIdentified ? 'Identitas saya' : 'Verifikasi kode akses'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => context.go('/siswa/pengaturan'),
+                      icon: const Icon(Icons.settings_outlined, size: 18),
+                      label: const Text('Pengaturan'),
                     ),
                     OutlinedButton.icon(
                       onPressed: () => context.push('/siswa/tentang'),

@@ -62,6 +62,16 @@ class TeacherShell extends ConsumerWidget {
         ),
         actions: [
           IconButton(
+            tooltip: 'Pencarian global',
+            onPressed: () => context.go('/guru/pencarian'),
+            icon: const Icon(Icons.search_rounded),
+          ),
+          IconButton(
+            tooltip: 'Chat',
+            onPressed: () => context.go('/guru/chat'),
+            icon: const Icon(Icons.forum_outlined),
+          ),
+          IconButton(
             tooltip: 'Tentang aplikasi',
             onPressed: () => context.push('/tentang?from=guru'),
             icon: const Icon(Icons.info_outline_rounded),
@@ -70,8 +80,14 @@ class TeacherShell extends ConsumerWidget {
             onSelected: (value) {
               if (value == 'logout') _logout(context, ref);
               if (value == 'about') context.push('/tentang?from=guru');
+              if (value == 'pengumuman') context.go('/guru/pengumuman');
+              if (value == 'kalender') context.go('/guru/kalender');
+              if (value == 'notifikasi') context.go('/guru/notifikasi');
             },
             itemBuilder: (context) => const [
+              PopupMenuItem(value: 'pengumuman', child: Text('Pengumuman')),
+              PopupMenuItem(value: 'kalender', child: Text('Kalender akademik')),
+              PopupMenuItem(value: 'notifikasi', child: Text('Notifikasi')),
               PopupMenuItem(value: 'about', child: Text('Tentang EduTask')),
               PopupMenuItem(
                 value: 'logout',

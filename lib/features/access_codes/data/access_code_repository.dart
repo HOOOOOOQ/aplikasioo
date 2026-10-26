@@ -8,6 +8,25 @@ import '../domain/access_code.dart';
 
 final accessCodeRepositoryProvider = Provider<AccessCodeRepository>((ref) => AccessCodeRepository());
 
+/// Hasil pemeriksaan idempotensi penerbitan kode.
+class AccessCodeIssueStatus {
+  final bool found;
+  final String? id;
+  final String? prefix;
+  final String? status;
+  final DateTime? expiresAt;
+
+  const AccessCodeIssueStatus({
+    required this.found,
+    this.id,
+    this.prefix,
+    this.status,
+    this.expiresAt,
+  });
+
+  static const AccessCodeIssueStatus notFound = AccessCodeIssueStatus(found: false);
+}
+
 class AccessCodeRepository {
   SupabaseClient? get _c => SupabaseService.tryClient;
 
@@ -123,6 +142,7 @@ class AccessCodeRepository {
     bool singleUse = true,
     int? expiresInDays,
     String? note,
+    String? idempotencyKey,
   }) async {
     final payload = <String, dynamic>{
       'kelas_id': kelasId,
@@ -130,6 +150,8 @@ class AccessCodeRepository {
       'single_use': singleUse,
       'expires_in_days': expiresInDays,
       'note': note,
+      if (idempotencyKey != null && idempotencyKey.isNotEmpty)
+        'idempotency_key': idempotencyKey,
     };
 
     final data = await _invoke('issue', payload, allowRetry: true);
@@ -138,6 +160,18 @@ class AccessCodeRepository {
         ? Map<String, dynamic>.from(data['data'] as Map)
         : <String, dynamic>{};
     if (code == null || code.isEmpty) {
+      // idempotency_key sudah pernah dipakai: kode sebelumnya TIDAK dapat
+      // ditampilkan lagi (plaintext tidak disimpan). Jangan pernah mengklaim
+      // sukses tanpa kode.
+      if (data['duplicate'] == true) {
+        throw const AppError(
+          title: 'Permintaan sudah pernah diproses',
+          message: 'Kode untuk permintaan ini sudah dibuat, tetapi kodenya tidak dapat '
+              'ditampilkan ulang karena hanya disimpan dalam bentuk hash.',
+          hint: 'Gunakan "Cek status" untuk melihat kode tersebut, atau terbitkan kode baru.',
+          code: 'duplicate_request',
+        );
+      }
       throw const AppError(
         title: 'Kode tidak terbentuk',
         message: 'Server tidak mengembalikan kode akses.',
@@ -154,6 +188,25 @@ class AccessCodeRepository {
 
   Future<void> revoke(String id) async {
     await _invoke('revoke', {'id': id}, allowRetry: true);
+  }
+
+  /// Cek apakah permintaan dengan [idempotencyKey] benar-benar membuat kode.
+  ///
+  /// Dipakai setelah timeout/jaringan putus agar pengguna tidak menerbitkan
+  /// kode ganda. Kode plaintext memang tidak dapat dikirim ulang.
+  Future<AccessCodeIssueStatus> status(String idempotencyKey) async {
+    final data = await _invoke('status', {'idempotency_key': idempotencyKey}, allowRetry: true);
+    if (data['found'] != true) return AccessCodeIssueStatus.notFound;
+    final row = data['data'] is Map
+        ? Map<String, dynamic>.from(data['data'] as Map)
+        : <String, dynamic>{};
+    return AccessCodeIssueStatus(
+      found: true,
+      id: row['id'] as String?,
+      prefix: row['kode_prefix'] as String?,
+      status: row['status'] as String?,
+      expiresAt: row['expires_at'] == null ? null : DateTime.tryParse(row['expires_at'].toString()),
+    );
   }
 
   /// Panggil Edge Function `student-codes` dengan sesi yang sudah divalidasi.

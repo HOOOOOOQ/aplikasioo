@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/session_guard.dart';
@@ -161,9 +162,10 @@ class _AccessCodesPageState extends ConsumerState<AccessCodesPage> {
       return;
     }
 
-    final issued = await showModalBottomSheet<IssuedAccessCode>(
+    final created = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      barrierDismissible: false,
       builder: (ctx) => _IssueCodeSheet(
         kelasList: kelasList,
         isTeacher: widget.isTeacher,
@@ -171,78 +173,16 @@ class _AccessCodesPageState extends ConsumerState<AccessCodesPage> {
       ),
     );
 
-    if (issued == null) return;
-    await _refresh();
-    if (!mounted) return;
-    await _showIssuedDialog(issued);
-  }
-
-  Future<void> _showIssuedDialog(IssuedAccessCode issued) async {
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        icon: const Icon(Icons.key_rounded, size: 30, color: AppColors.success),
-        title: const Text('Kode berhasil dibuat'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Berikan kode ini kepada siswa. Kode hanya ditampilkan sekali dan tidak dapat dilihat lagi setelah dialog ini ditutup.',
-              style: TextStyle(fontSize: 12.5, height: 1.5),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg, horizontal: AppSpacing.md),
-              decoration: BoxDecoration(
-                color: AppColors.primaryContainer,
-                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
-              ),
-              child: SelectableText(
-                issued.code,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 2,
-                  color: AppColors.primaryDark,
-                ),
-              ),
-            ),
-            if (issued.expiresAt != null) ...[
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Berlaku sampai ${AppDateUtils.formatTanggalJam(issued.expiresAt)}',
-                style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Tutup'),
-          ),
-          FilledButton.icon(
-            onPressed: () async {
-              // Messenger diambil sebelum await agar tidak memakai BuildContext
-              // setelah jeda async (lint use_build_context_synchronously).
-              final messenger = ScaffoldMessenger.of(context);
-              await Clipboard.setData(ClipboardData(text: issued.code));
-              if (!dialogContext.mounted) return;
-              Navigator.pop(dialogContext);
-              messenger.showSnackBar(
-                const SnackBar(content: Text('Kode disalin ke clipboard.')),
-              );
-            },
-            icon: const Icon(Icons.copy_rounded, size: 17),
-            label: const Text('Salin kode'),
-          ),
-        ],
-      ),
-    );
+    if (created != true) return;
+    // Refresh daftar SETELAH kode tampil di sheet. Kegagalan refresh tidak
+    // boleh menutupi fakta bahwa kode sudah berhasil dibuat.
+    try {
+      await _refresh();
+    } catch (_) {
+      if (mounted) {
+        showAppSnackBar(context, 'Kode dibuat, tetapi daftar belum dapat dimuat ulang.', isError: true);
+      }
+    }
   }
 
   Future<void> _revoke(AccessCode code) async {
@@ -604,10 +544,18 @@ class _IssueCodeSheetState extends ConsumerState<_IssueCodeSheet> {
   bool _submitting = false;
   AppError? _error;
 
+  /// Kunci idempotensi: satu permintaan logis = satu kunci. Retry memakai
+  /// kunci yang sama agar server tidak membuat kode ganda.
+  late final String _idempotencyKey;
+  IssuedAccessCode? _issued;
+  bool _checkingStatus = false;
+  AccessCodeIssueStatus? _statusResult;
+
   @override
   void initState() {
     super.initState();
     _kelasId = widget.kelasList.first.id;
+    _idempotencyKey = const Uuid().v4();
     _loadRoster();
   }
 
@@ -660,9 +608,16 @@ class _IssueCodeSheetState extends ConsumerState<_IssueCodeSheet> {
             singleUse: _singleUse,
             expiresInDays: _expiresInDays,
             note: _noteC.text.trim().isEmpty ? null : _noteC.text.trim(),
+            idempotencyKey: _idempotencyKey,
           );
       if (!mounted) return;
-      Navigator.pop(context, issued);
+      // Kode hanya ditampilkan SETELAH server mengonfirmasi. Sheet tidak
+      // ditutup otomatis: pengguna harus menutupnya sendiri setelah menyalin.
+      setState(() {
+        _issued = issued;
+        _submitting = false;
+        _error = null;
+      });
     } catch (e) {
       final error = AppError.from(e);
       final handler = widget.onSessionExpired;
@@ -673,15 +628,52 @@ class _IssueCodeSheetState extends ConsumerState<_IssueCodeSheet> {
         return;
       }
       if (!mounted) return;
-      setState(() => _error = error);
-    } finally {
-      if (mounted) setState(() => _submitting = false);
+      setState(() {
+        _error = error;
+        _submitting = false;
+      });
+    }
+  }
+
+  bool _needsStatusCheck(AppError error) {
+    const codes = {'network', 'timeout', 'unknown', 'duplicate_request', 'server_error'};
+    return codes.contains(error.code);
+  }
+
+  /// Cek ke server apakah permintaan ini ternyata sudah membuat kode
+  /// (mis. timeout pada respons, padahal server sempat menyimpan).
+  Future<void> _checkStatus() async {
+    if (_checkingStatus) return;
+    setState(() {
+      _checkingStatus = true;
+      _statusResult = null;
+    });
+    try {
+      final result = await ref.read(accessCodeRepositoryProvider).status(_idempotencyKey);
+      if (!mounted) return;
+      setState(() {
+        _checkingStatus = false;
+        _statusResult = result;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _checkingStatus = false;
+        _error = AppError.from(e);
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    // Kode tampil di sheet yang sama. Tidak ada navigasi otomatis ke halaman
+    // lain, sehingga kode tidak hilang karena layar berpindah.
+    final issued = _issued;
+    if (issued != null) {
+      return _IssuedCodeView(issued: issued, onClose: () => Navigator.pop(context, true));
+    }
 
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
@@ -802,6 +794,33 @@ class _IssueCodeSheetState extends ConsumerState<_IssueCodeSheet> {
                   title: _error!.title,
                   text: _error!.hint == null ? _error!.message : '${_error!.message} ${_error!.hint}',
                 ),
+                if (_needsStatusCheck(_error!)) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  OutlinedButton.icon(
+                    onPressed: _checkingStatus ? null : _checkStatus,
+                    icon: _checkingStatus
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.fact_check_outlined, size: 18),
+                    label: Text(_checkingStatus ? 'Memeriksa…' : 'Cek status permintaan'),
+                  ),
+                  if (_statusResult != null) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    _statusResult!.found
+                        ? AppNotice.warning(
+                            title: 'Kode sudah terbit',
+                            text: 'Prefix ${_statusResult!.prefix ?? '-'} sudah tersimpan di server '
+                                '(${_statusResult!.status ?? 'aktif'}). Untuk keamanan, kode lengkap tidak '
+                                'dapat ditampilkan ulang. Terbitkan kode baru bila siswa belum menerimanya.',
+                          )
+                        : const AppNotice.success(
+                            text: 'Tidak ada kode yang terbuat dari permintaan ini. Aman untuk mencoba lagi.',
+                          ),
+                  ],
+                ],
               ],
               const SizedBox(height: AppSpacing.lg),
               SizedBox(
@@ -828,6 +847,112 @@ class _IssueCodeSheetState extends ConsumerState<_IssueCodeSheet> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tampilan kode yang baru terbit: tetap di sheet, wajib ditutup manual.
+class _IssuedCodeView extends StatefulWidget {
+  final IssuedAccessCode issued;
+  final VoidCallback onClose;
+
+  const _IssuedCodeView({required this.issued, required this.onClose});
+
+  @override
+  State<_IssuedCodeView> createState() => _IssuedCodeViewState();
+}
+
+class _IssuedCodeViewState extends State<_IssuedCodeView> {
+  bool _copied = false;
+
+  Future<void> _copy() async {
+    await Clipboard.setData(ClipboardData(text: widget.issued.code));
+    if (!mounted) return;
+    setState(() => _copied = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Kode disalin ke clipboard.'), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  Future<void> _close() async {
+    if (!_copied) {
+      final confirmed = await showConfirmDialog(
+        context,
+        title: 'Tutup tanpa menyalin?',
+        content: 'Kode hanya ditampilkan sekali. Setelah ditutup, kode ini tidak dapat dilihat lagi.',
+        confirmLabel: 'Tutup',
+        cancelLabel: 'Kembali',
+      );
+      if (!confirmed) return;
+    }
+    if (!mounted) return;
+    widget.onClose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final issued = widget.issued;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Icon(Icons.check_circle_rounded, size: 42, color: AppColors.success),
+            const SizedBox(height: AppSpacing.sm),
+            const Text(
+              'Kode berhasil dibuat',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            const Text(
+              'Berikan kode ini kepada siswa. Kode hanya ditampilkan sekali.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg, horizontal: AppSpacing.md),
+              decoration: BoxDecoration(
+                color: AppColors.primaryContainer,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+              ),
+              child: SelectableText(
+                issued.code,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 2,
+                  color: AppColors.primaryDark,
+                ),
+              ),
+            ),
+            if (issued.expiresAt != null) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Berlaku sampai ${AppDateUtils.formatTanggalJam(issued.expiresAt)}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+              ),
+            ],
+            const SizedBox(height: AppSpacing.lg),
+            FilledButton.icon(
+              onPressed: _copy,
+              icon: const Icon(Icons.copy_rounded, size: 18),
+              label: Text(_copied ? 'Tersalin • Salin lagi' : 'Salin kode'),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextButton(
+              onPressed: _close,
+              child: const Text('Selesai'),
+            ),
+          ],
         ),
       ),
     );

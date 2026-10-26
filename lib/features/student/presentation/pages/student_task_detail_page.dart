@@ -15,6 +15,7 @@ import '../../../../core/widgets/status_chip.dart';
 import '../../../../shared/models/tugas.dart';
 import '../../../../shared/repositories/tugas_repository.dart';
 import '../../../../shared/services/attachment_service.dart';
+import '../../../akademik/presentation/pengumpulan_section.dart';
 import '../../identity/student_identity_provider.dart';
 
 final taskDetailProvider = FutureProvider.autoDispose.family<Tugas?, String>((ref, taskId) async {
@@ -394,13 +395,25 @@ class _StudentTaskDetailPageState extends ConsumerState<StudentTaskDetailPage> {
                       const SizedBox(width: AppSpacing.md),
                       Expanded(
                         child: FilledButton.icon(
-                          onPressed: () => context.push('/guru/tugas/${tugas.id}/status'),
+                          onPressed: () => widget.adminMode
+                              ? context.push('/admin/tugas/${tugas.id}/status')
+                              : context.push('/guru/tugas/${tugas.id}/status'),
                           icon: const Icon(Icons.groups_rounded, size: 18),
                           label: const Text('Status siswa'),
                         ),
                       ),
                     ],
                   ),
+                ],
+                const SizedBox(height: AppSpacing.xl),
+                if (widget.isTeacherView) ...[
+                  StaffPengumpulanSection(tugasId: tugas.id),
+                  const SizedBox(height: AppSpacing.lg),
+                  TugasDiskusiSection(tugasId: tugas.id, staff: true),
+                ] else ...[
+                  StudentPengumpulanSection(tugasId: tugas.id),
+                  const SizedBox(height: AppSpacing.lg),
+                  TugasDiskusiSection(tugasId: tugas.id, staff: false),
                 ],
               ],
             );

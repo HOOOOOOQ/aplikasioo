@@ -7,6 +7,7 @@
 //   { "action": "issue", "kelas_id": "<uuid>", "siswa_id": "<uuid|null>",
 //     "single_use": true, "expires_in_days": 30, "note": "..." }
 //   { "action": "revoke", "id": "<uuid>" }
+//   { "action": "status", "idempotency_key": "<uuid>" }  // cek hasil penerbitan
 //
 // Otorisasi (diverifikasi ulang di server terhadap tabel profiles):
 //   * admin  → semua kelas
@@ -267,9 +268,38 @@ serve(async (req: Request) => {
       }
     };
 
+    // ------------------------- STATUS -------------------------
+    // Dipakai saat aplikasi timeout/tidak yakin apakah penerbitan berhasil.
+    // Tidak pernah membuat kode baru — hanya melaporkan baris yang sudah ada.
+    if (action === "status") {
+      const key = String(body.idempotency_key ?? "").trim();
+      if (!isUuid(key)) {
+        return json(400, { error: "idempotency_key tidak valid.", code: "invalid_id" });
+      }
+      const { data: row, error: rowErr } = await admin
+        .from("kode_akses_siswa")
+        .select("id, kode_prefix, kelas_id, siswa_id, single_use, status, expires_at, created_at, created_by")
+        .eq("idempotency_key", key)
+        .maybeSingle();
+
+      if (rowErr) {
+        console.error("student-codes: status gagal", rowErr.code);
+        if (isSchemaMissing(rowErr)) return schemaNotReadyResponse();
+        return json(500, { error: "Gagal memeriksa status kode.", code: "lookup_failed" });
+      }
+      if (!row) return json(200, { success: true, found: false });
+      if (row.created_by !== user.id && role !== "admin") {
+        return json(403, { error: "Anda tidak berwenang atas kode ini.", code: "forbidden" });
+      }
+      // Kode plaintext TIDAK disimpan, jadi tidak bisa dikirim ulang.
+      return json(200, { success: true, found: true, data: row, kode: null });
+    }
+
     // ------------------------- ISSUE -------------------------
     if (action === "issue") {
       const kelasId = String(body.kelas_id ?? "").trim();
+      const idempotencyKeyRaw = String(body.idempotency_key ?? "").trim();
+      const idempotencyKey = idempotencyKeyRaw === "" ? null : idempotencyKeyRaw;
       const siswaIdRaw = body.siswa_id;
       const siswaId = siswaIdRaw === null || siswaIdRaw === undefined || siswaIdRaw === ""
         ? null
@@ -283,6 +313,9 @@ serve(async (req: Request) => {
       }
       if (siswaId !== null && !isUuid(siswaId)) {
         return json(400, { error: "siswa_id tidak valid.", code: "invalid_siswa" });
+      }
+      if (idempotencyKey !== null && !isUuid(idempotencyKey)) {
+        return json(400, { error: "idempotency_key tidak valid.", code: "invalid_id" });
       }
 
       let expiresAt: string | null = null;
@@ -334,6 +367,29 @@ serve(async (req: Request) => {
         }
       }
 
+      // Idempotency: bila kunci ini sudah dipakai, JANGAN buat kode kedua.
+      if (idempotencyKey) {
+        const { data: existing, error: existingErr } = await admin
+          .from("kode_akses_siswa")
+          .select("id, kode_prefix, kelas_id, siswa_id, single_use, status, expires_at, created_at")
+          .eq("idempotency_key", idempotencyKey)
+          .maybeSingle();
+
+        if (existingErr && !isSchemaMissing(existingErr)) {
+          console.error("student-codes: cek idempotency gagal", existingErr.code);
+          return json(500, { error: "Gagal memeriksa kode sebelumnya.", code: "lookup_failed" });
+        }
+        if (existing) {
+          return json(200, {
+            success: true,
+            duplicate: true,
+            kode: null,
+            data: existing,
+            message: "Kode untuk permintaan ini sudah terbit sebelumnya dan tidak dapat ditampilkan ulang.",
+          });
+        }
+      }
+
       let generated = "";
       let inserted: JsonMap | null = null;
       for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {
@@ -350,6 +406,7 @@ serve(async (req: Request) => {
             expires_at: expiresAt,
             created_by: user.id,
             note: note || null,
+            idempotency_key: idempotencyKey,
           })
           .select("id, kode_prefix, kelas_id, siswa_id, single_use, status, expires_at, created_at")
           .single();
@@ -362,6 +419,18 @@ serve(async (req: Request) => {
           console.error("student-codes: insert gagal", error.code);
           if (isSchemaMissing(error)) return schemaNotReadyResponse();
           return json(500, { error: "Gagal membuat kode.", code: "insert_failed" });
+        }
+        if (error && error.code === "23505" && idempotencyKey) {
+          // Balapan dua permintaan dengan kunci sama: yang kalah melaporkan
+          // kode yang sudah tersimpan, bukan membuat kode baru.
+          const { data: existing } = await admin
+            .from("kode_akses_siswa")
+            .select("id, kode_prefix, kelas_id, siswa_id, single_use, status, expires_at, created_at")
+            .eq("idempotency_key", idempotencyKey)
+            .maybeSingle();
+          if (existing) {
+            return json(200, { success: true, duplicate: true, kode: null, data: existing });
+          }
         }
       }
 
