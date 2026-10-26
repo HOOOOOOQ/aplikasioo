@@ -157,6 +157,11 @@ Secret yang dibutuhkan function (Dashboard → **Edge Functions** → **Secrets*
 (Actions → Run workflow) setelah menambahkan Secrets `SUPABASE_ACCESS_TOKEN` dan
 `SUPABASE_PROJECT_REF`. Workflow ini manual, tidak jalan otomatis ke produksi.
 
+**Deploy tanpa CLI / hanya dari browser:** ikuti
+[`docs/deploy-via-dashboard.md`](docs/deploy-via-dashboard.md) — termasuk cara mengaktifkan
+*Verify JWT* dari Dashboard (pengganti `config.toml`) dan menguji function lewat
+[`docs/tester-create-teacher.html`](docs/tester-create-teacher.html) (buka file-nya di Chrome).
+
 #### Uji cepat Edge Function tanpa Flutter (opsional)
 ```bash
 SUPABASE_URL="https://xxxx.supabase.co" \
