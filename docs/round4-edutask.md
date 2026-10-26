@@ -181,7 +181,34 @@ minSdk 24, target 36). Lihat tabel APK di bagian 11.
 
 ## 11. APK (build CI terakhir)
 
-<!-- APK_TABLE -->
+Build main terakhir: **#80** (commit `a8e6d87`, workflow run `40421924956`,
+job `build` + `install-test` sukses). Artefak dipublikasikan pada GitHub Release
+[`latest-apk`](https://github.com/HOOOOOOQ/aplikasioo/releases/tag/latest-apk).
+
+| File | Ukuran (byte) | SHA-256 |
+|---|---:|---|
+| `EduTask-1.2.0-arm64-v8a.apk` | 26.733.401 | `4bbdee615043660c915077e7a464380f5ece5650286c42d06d31e15a49393ea8` |
+| `EduTask-1.2.0-armeabi-v7a.apk` | 24.591.199 | `18d20d5d3a2a9dc22ccc139278cd34e9f9780a5b651403af745e542eeb94c89b` |
+| `EduTask-1.2.0-universal.apk` | 66.395.430 | `4636b3ccf75e1f9c7379db8cac74c7d79cfe403abcc38a8b1d26ccf87650a65f` |
+| `EduTask-1.2.0-x86_64.apk` | 27.908.944 | `0205fea57c83109f7bd937dc5fd47c93c4faccc091267fcaa76728e4adebd3d8` |
+| `SHA256SUMS.txt` | 375 | — |
+
+Metadata APK (dibaca `aapt` + `apksigner` oleh CI):
+
+| Properti | Nilai |
+|---|---|
+| package | `com.edutask.sekolah` |
+| versionName / versionCode | `1.2.0` / `80` (split: `2079` arm64, `1079` armeabi-v7a, `79` universal, `4079` x86_64) |
+| minSdk / targetSdk / compileSdk | 24 / 36 / 36 |
+| ABI | arm64-v8a, armeabi-v7a, x86_64 (+ universal) |
+| Signature | v2 **valid**, v3 **valid**, v3.1/v3.2 false (tidak diperlukan) |
+| Signer SHA-256 | `f3d985e457b01512b34091c25826869ed48fe9efd42b988375fc401562ffcbf9` |
+| Algoritma | RSA 2048 (keystore test yang di-commit; **bukan** kunci Play Store) |
+
+Catatan: APK belum diuji instalasi pada perangkat fisik/emulator nyata dari
+sisi agen. Job `install-test` CI berjalan sukses, tetapi status ini bukan bukti
+uji manual di HP pengguna.
+
 
 ## 12. Langkah manual di Supabase & risiko residual
 

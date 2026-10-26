@@ -3,11 +3,18 @@
 **Tugas & Jadwal Sekolah** — aplikasi Flutter + Supabase untuk mengelola jadwal pelajaran,
 tugas, lampiran, kode akses siswa, dan laporan penyelesaian tugas.
 
-> **Ronde 3 (v1.2.0):** perbaikan skema database kode akses (migration `005`),
-> verifikasi sesi/token yang benar pada Edge Function, refresh sesi otomatis sekali
-> saat server menolak token, serta pesan error spesifik (skema, sesi, kode akses).
-> Detail: [`docs/round3-edutask.md`](docs/round3-edutask.md).
+> **Ronde 4 (v1.2.0, build #80):** navigasi Back yang konsisten (konfirmasi
+> keluar di beranda), kode akses idempoten + tampil tanpa navigasi otomatis,
+> fondasi akademik & chat (pengumuman, kalender, pengumpulan/nilai, diskusi,
+> chat realtime, notifikasi, pencarian), splash baru dengan suara pembuka
+> opsional, serta tutorial 5 langkah.
+> Detail: [`docs/round4-edutask.md`](docs/round4-edutask.md).
 >
+> **Ronde 3 (v1.2.0):** perbaikan skema database kode akses (migration `005`),
+> verifikasi sesi/token yang benar pada Edge Function, refresh sesi otomatis
+> sekali saat server menolak token, serta pesan error spesifik.
+> Detail: [`docs/round3-edutask.md`](docs/round3-edutask.md).
+
 > **Ronde 2 (v1.1.0):** perbaikan akar masalah Storage 403, sistem kode akses siswa
 > berbasis server, modul admin yang terhubung backend, serta desain ulang UI.
 > Detail perubahan, bukti validasi, dan daftar hal yang belum diuji:
