@@ -127,17 +127,62 @@ values ('<uuid-dari-auth.users>', 'Administrator', 'admin@sekolah.id', 'admin', 
 -- Untuk guru: role = 'guru'
 ```
 
-### 5. Edge Functions (opsional tapi disarankan)
+### 5. Edge Functions (wajib untuk undang guru & status tugas online)
 ```bash
 npm i -g supabase
 supabase login
 supabase link --project-ref <project-ref>
-supabase functions deploy create-teacher --no-verify-jwt
-supabase functions deploy student-access --no-verify-jwt
-supabase functions deploy update-student-task-status --no-verify-jwt
+
+# create-teacher: JWT diverifikasi gateway (verify_jwt=true di supabase/config.toml)
+supabase functions deploy create-teacher
+
+# Endpoint siswa: verify_jwt=false di config.toml (siswa tidak login)
+supabase functions deploy student-access
+supabase functions deploy update-student-task-status
 ```
-Dashboard → Edge Functions → **Secrets**: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`.  
-Jika belum deploy: undang guru & validasi kode siswa akan fallback (sudah di-handle tanpa FC) dan tampil log.
+
+`supabase/config.toml` sudah menetapkan `verify_jwt` per function, jadi **tidak perlu** flag
+`--no-verify-jwt` untuk `create-teacher`. Jika project ini sebelumnya men-deploy dengan
+`--no-verify-jwt` dan ingin mengembalikan proteksi gateway, jalankan ulang perintah deploy di atas.
+
+Secret yang dibutuhkan function (Dashboard → **Edge Functions** → **Secrets**, jangan commit nilainya):
+- `SUPABASE_URL` — URL project yang **sama** dengan `--dart-define=SUPABASE_URL` saat build APK
+- `SUPABASE_SERVICE_ROLE_KEY` — hanya untuk server (function). Fallback nama `SERVICE_ROLE_KEY` juga didukung.
+- `SUPABASE_ANON_KEY` — tidak lagi dibutuhkan oleh `create-teacher` versi ini (tidak ada lagi ketergantungan pada anon key untuk verifikasi token).
+
+> **Penting:** function harus berada di project yang sama dengan URL/anon key yang dipakai APK.
+> Jika berbeda, token admin tidak dikenali dan function membalas **401**.
+
+**Deploy lewat GitHub Actions (opsional):** jalankan workflow **Deploy Supabase Edge Functions**
+(Actions → Run workflow) setelah menambahkan Secrets `SUPABASE_ACCESS_TOKEN` dan
+`SUPABASE_PROJECT_REF`. Workflow ini manual, tidak jalan otomatis ke produksi.
+
+#### Uji cepat Edge Function tanpa Flutter (opsional)
+```bash
+SUPABASE_URL="https://xxxx.supabase.co" \
+SUPABASE_ANON_KEY="<anon/publishable key>" \
+ADMIN_EMAIL="admin@sekolah.id" ADMIN_PASSWORD="<password admin>" \
+node scripts/test-create-teacher.mjs
+```
+Script menguji: request tanpa token → 401, token palsu → 401, login admin, dan (bila
+`GURU_EMAIL`/`GURU_PASSWORD` diisi) guru non-admin → 403. Tambahkan `CREATE_TEST_TEACHER=1`
+hanya jika ingin benar-benar membuat akun guru uji. Script tidak mencetak token/secret.
+
+#### Diagnosis 401 `create-teacher`
+Balasan function `{"error":"Unauthorized"}` (persis seperti di aplikasi) berasal dari
+**verifikasi token di dalam function**, bukan dari gateway — artinya function sudah berjalan
+tetapi `auth.getUser(token)` menolak token admin. Penyebab yang mungkin:
+
+| Gejala | Arti | Tindakan |
+|---|---|---|
+| 401 `{error: "Unauthorized ..."}` | Token admin tidak valid/kedaluwarsa, atau ditandatangani project lain | Login ulang (client kini me-refresh token otomatis), samakan `SUPABASE_URL` APK dengan project function |
+| 401 `{code: 401, message: "Invalid JWT"}` | Ditandatangani/ditolak gateway | Sama seperti di atas; pastikan `verify_jwt=true` pada project yang benar |
+| 403 `{error: "Forbidden ..."}` | Token valid, tapi `profiles.role != admin` atau `is_active != true` | Perbaiki baris `profiles` |
+| 404 | Function belum dideploy | `supabase functions deploy create-teacher` |
+| 500 `server_misconfigured` | Secret server belum ada | Set `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` |
+
+> Aplikasi **tidak** mematikan verifikasi dan **tidak** memakai `service_role` di client.
+> `service_role` hanya dipakai di dalam Edge Function.
 
 ---
 
@@ -262,6 +307,7 @@ Tanpa secrets, job *without* secrets tetap build demo APK (tidak error `SUPABASE
 ## 🛡️ Keamanan
 
 - **Tidak ada `service_role` di APK** — hanya `anonKey` via `--dart-define` (aman di `SupabaseConfig.fromEnvironment`)
+- `create-teacher`: identitas admin diambil **hanya** dari bearer token yang diverifikasi ke GoTrue (`auth.getUser(token)`), role dibaca dari `profiles` memakai service_role di server; input divalidasi; duplikasi email ditolak (409); jika insert profil gagal, user Auth di-rollback
 - RLS aktif di semua tabel; `profiles.role` diverifikasi server, bukan dari client
 - Siswa anon hanya `SELECT` jadwal/tugas `published` + daftar kelas/mapel; tidak bisa insert/update langsung
 - Status tugas via Edge Function + validasi `kode_akses` + kecocokan `kelas_id` + token akses; fallback lokal dijelaskan sebagai *tidak resmi*
@@ -295,6 +341,7 @@ lib/
     repositories/{kelas,siswa,jadwal,mapel,tugas}_repository.dart
     services/supabase_service.dart
 supabase/
+  config.toml                        # verify_jwt per Edge Function
   migrations/001_initial_schema.sql  # 8+ tabel + RLS + trigger
   functions/{create-teacher,student-access,update-student-task-status}/index.ts
 .github/workflows/build-apk.yml
@@ -313,7 +360,11 @@ test/                               # deadline, date, role, RLS, akses publik
 | `Failed host lookup` / tidak ada koneksi | Cek internet & URL `https://...supabase.co` (tanpa trailing slash). |
 | Login gagal `Invalid login credentials` | Pastikan user ada di **Auth → Users** DAN ada baris di `profiles` dengan `role` `admin`/`guru` & `is_active=true`. |
 | `force close` saat buka halaman siswa | Sudah di-fix: semua repository `return []` bila `!isReady`, UI `try/catch`. Jika masih, cek `flutter analyze` & laporkan log `adb logcat`. |
-| Undang guru gagal | Deploy Edge Function `create-teacher` + isi Secrets `SUPABASE_SERVICE_ROLE_KEY`. Tanpa itu, fallback tampil error jelas. |
+| Undang guru gagal `HTTP 401` | **Sesi admin tidak valid** atau **function ada di project berbeda**. Aplikasi otomatis me-refresh token sebelum memanggil function; jika tetap 401: (1) logout → login ulang sebagai admin, (2) pastikan `--dart-define=SUPABASE_URL`/`ANON_KEY` APK = project tempat function dideploy, (3) redeploy `supabase functions deploy create-teacher` (lihat §5). Detail penyebab kini tampil di dialog, bukan pesan generik. |
+| Undang guru gagal `HTTP 403` | User login valid tetapi bukan admin aktif. Cek `select id,email,role,is_active from profiles;` → baris admin harus `role='admin'`, `is_active=true`. |
+| Undang guru gagal `HTTP 404` | Function belum ada di project. Jalankan `supabase functions deploy create-teacher`. |
+| Undang guru gagal `HTTP 500` | Secret `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` belum ter-set di Edge Functions → Secrets, atau migration `profiles` belum dijalankan. |
+| Undang guru gagal (lainnya) | Deploy Edge Function `create-teacher` + isi Secrets `SUPABASE_SERVICE_ROLE_KEY`. Tanpa itu, aplikasi menampilkan error yang dapat ditindaklanjuti (bukan FC). |
 | Jadwal bentrok | Constraint DB mencegah overlap kelas/guru di hari & jam sama — ubah jam atau ruang. |
 | Upload lampiran gagal `bucket not found` | Buat bucket `lampiran-tugas` public + policy `insert` untuk `authenticated`. |
 | `There was a problem parsing the package` saat install APK | Android 12+ wajib `android:exported="true"` pada activity dengan intent-filter — sudah di `AndroidManifest.xml`. Juga cek *Install unknown apps* diizinkan untuk Chrome/Files di **Settings → Apps → Special access**. Uninstall APK debug lama jika ganti signature. |
