@@ -5,18 +5,18 @@ import 'package:edutask/features/auth/domain/app_user.dart';
 /// Peran (role) hanya boleh berasal dari database. Nilai tak dikenal tidak
 /// boleh "naik" menjadi admin di sisi klien.
 void main() {
-  group('UserRole.fromString', () {
+  group('UserRoleX.fromString', () {
     test('memetakan peran yang sah', () {
-      expect(UserRole.fromString('admin'), UserRole.admin);
-      expect(UserRole.fromString('ADMIN'), UserRole.admin);
-      expect(UserRole.fromString('guru'), UserRole.guru);
-      expect(UserRole.fromString('Guru'), UserRole.guru);
+      expect(UserRoleX.fromString('admin'), UserRole.admin);
+      expect(UserRoleX.fromString('ADMIN'), UserRole.admin);
+      expect(UserRoleX.fromString('guru'), UserRole.guru);
+      expect(UserRoleX.fromString('Guru'), UserRole.guru);
     });
 
     test('peran siswa/tak dikenal tidak pernah menjadi admin', () {
       for (final value in ['siswa', 'student', 'user', '', null, 'admin ', 'administrator']) {
         expect(
-          UserRole.fromString(value),
+          UserRoleX.fromString(value),
           UserRole.unknown,
           reason: 'nilai "$value" tidak boleh dipetakan ke peran istimewa',
         );
