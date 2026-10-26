@@ -34,8 +34,10 @@ class _AdminSubjectsPageState extends State<AdminSubjectsPage> {
     setState(() { _loading = true; _error = null; });
     try {
       final d = await MapelRepository().fetchAll();
+      if (!mounted) return;
       setState(() { _list = d; _loading = false; });
     } catch (e) {
+      if (!mounted) return;
       setState(() { _loading = false; _error = e.toString(); });
     }
   }
@@ -61,7 +63,7 @@ class _AdminSubjectsPageState extends State<AdminSubjectsPage> {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
-          ElevatedButton(onPressed: () { if (formKey.currentState!.validate()) Navigator.pop(ctx, true); }, child: Text(existing == null ? 'Tambah' : 'Simpan')),
+          ElevatedButton(onPressed: () { if (formKey.currentState?.validate() ?? false) Navigator.pop(ctx, true); }, child: Text(existing == null ? 'Tambah' : 'Simpan')),
         ],
       ),
     );

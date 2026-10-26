@@ -57,7 +57,9 @@ class AuthRepository {
     required String fullName,
   }) async {
     try {
-      final res = await _client.functions.invoke(
+      final gc = _tryClient;
+      if (gc == null) throw Exception('Supabase belum dikonfigurasi');
+      final res = await gc.functions.invoke(
         'create-teacher',
         body: {
           'email': email,

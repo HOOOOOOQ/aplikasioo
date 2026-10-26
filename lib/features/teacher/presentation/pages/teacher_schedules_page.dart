@@ -36,8 +36,10 @@ class _TeacherSchedulesPageState extends State<TeacherSchedulesPage> {
       final guruId = SupabaseService.tryClient?.auth.currentUser?.id;
       if (guruId == null) throw Exception('Belum login');
       final data = await JadwalRepository().fetchByGuru(guruId);
+      if (!mounted) return;
       setState(() { _list = data; _loading = false; });
     } catch (e) {
+      if (!mounted) return;
       setState(() { _loading = false; _error = e.toString(); });
     }
   }

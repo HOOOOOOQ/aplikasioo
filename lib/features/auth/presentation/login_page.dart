@@ -31,7 +31,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!(_formKey.currentState?.validate() ?? false)) return;
     if (SupabaseConfig.isNotConfigured) {
       showAppSnackBar(context, 'Supabase belum dikonfigurasi. Hubungi admin.', isError: true);
       return;

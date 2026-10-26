@@ -40,8 +40,10 @@ class _TeacherTasksPageState extends State<TeacherTasksPage> {
       if (!SupabaseService.isReady) throw Exception('Supabase belum siap');
       final guruId = SupabaseService.tryClient?.auth.currentUser?.id;
       final data = await TugasRepository().fetchAll(guruId: guruId);
+      if (!mounted) return;
       setState(() { _list = data; _loading = false; });
     } catch (e) {
+      if (!mounted) return;
       setState(() { _loading = false; _error = e.toString(); });
     }
   }

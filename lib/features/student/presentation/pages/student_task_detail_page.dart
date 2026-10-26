@@ -176,8 +176,20 @@ class _StudentTaskDetailPageState extends ConsumerState<StudentTaskDetailPage> {
                                   onPressed: () async {
                                     try {
                                       final url = TugasRepository().getPublicUrl(tugas.lampiranPath!);
-                                      final uri = Uri.parse(url);
-                                      if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                      if (url.isEmpty) {
+                                        if (mounted) showAppSnackBar(context, 'Link lampiran tidak tersedia (mode demo)', isError: true);
+                                        return;
+                                      }
+                                      final uri = Uri.tryParse(url);
+                                      if (uri == null || !uri.hasScheme) {
+                                        if (mounted) showAppSnackBar(context, 'Link lampiran tidak valid', isError: true);
+                                        return;
+                                      }
+                                      if (await canLaunchUrl(uri)) {
+                                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                      } else {
+                                        if (mounted) showAppSnackBar(context, 'Tidak ada aplikasi untuk membuka link', isError: true);
+                                      }
                                     } catch (e) {
                                       if (mounted) showAppSnackBar(context, 'Gagal membuka lampiran', isError: true);
                                     }

@@ -18,7 +18,8 @@ class KelasRepository {
   }
 
   Future<Kelas> create({required String namaKelas, String? tingkat, String? tahunAjaran, String? waliKelasId}) async {
-    final c = SupabaseService.client;
+    final c = SupabaseService.tryClient;
+    if (c == null) throw Exception('Supabase belum dikonfigurasi — atur SUPABASE_URL/ANON_KEY');
     final res = await c.from('kelas').insert({
       'nama_kelas': namaKelas,
       'tingkat': tingkat,
@@ -29,13 +30,16 @@ class KelasRepository {
   }
 
   Future<Kelas> update(String id, Map<String, dynamic> patch) async {
-    final c = SupabaseService.client;
+    final c = SupabaseService.tryClient;
+    if (c == null) throw Exception('Supabase belum dikonfigurasi — atur SUPABASE_URL/ANON_KEY');
     final res = await c.from('kelas').update(patch).eq('id', id).select().single();
     return Kelas.fromJson(res);
   }
 
   Future<void> delete(String id) async {
-    await SupabaseService.client.from('kelas').delete().eq('id', id);
+    final _guard = SupabaseService.tryClient;
+    if (_guard == null) throw Exception('Supabase belum dikonfigurasi');
+    await _guard.from('kelas').delete().eq('id', id);
   }
 
   Future<int> countSiswa(String kelasId) async {

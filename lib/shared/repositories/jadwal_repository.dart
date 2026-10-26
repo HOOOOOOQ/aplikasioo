@@ -24,16 +24,22 @@ class JadwalRepository {
   Future<List<Jadwal>> fetchByGuru(String guruId) => fetchAll(guruId: guruId);
 
   Future<Jadwal> create(Map<String, dynamic> payload) async {
-    final res = await SupabaseService.client.from('jadwal_pelajaran').insert(payload).select('*, kelas(nama_kelas), mata_pelajaran(nama_mapel), profiles!jadwal_pelajaran_guru_id_fkey(full_name)').single();
+    final _gc = SupabaseService.tryClient;
+    if (_gc == null) throw Exception('Supabase belum dikonfigurasi');
+    final res = await _gc.from('jadwal_pelajaran').insert(payload).select('*, kelas(nama_kelas), mata_pelajaran(nama_mapel), profiles!jadwal_pelajaran_guru_id_fkey(full_name)').single();
     return Jadwal.fromJson(res);
   }
 
   Future<Jadwal> update(String id, Map<String, dynamic> patch) async {
-    final res = await SupabaseService.client.from('jadwal_pelajaran').update(patch).eq('id', id).select('*, kelas(nama_kelas), mata_pelajaran(nama_mapel), profiles!jadwal_pelajaran_guru_id_fkey(full_name)').single();
+    final _gu = SupabaseService.tryClient;
+    if (_gu == null) throw Exception('Supabase belum dikonfigurasi');
+    final res = await _gu.from('jadwal_pelajaran').update(patch).eq('id', id).select('*, kelas(nama_kelas), mata_pelajaran(nama_mapel), profiles!jadwal_pelajaran_guru_id_fkey(full_name)').single();
     return Jadwal.fromJson(res);
   }
 
   Future<void> delete(String id) async {
-    await SupabaseService.client.from('jadwal_pelajaran').delete().eq('id', id);
+    final _guard = SupabaseService.tryClient;
+    if (_guard == null) throw Exception('Supabase belum dikonfigurasi');
+    await _guard.from('jadwal_pelajaran').delete().eq('id', id);
   }
 }

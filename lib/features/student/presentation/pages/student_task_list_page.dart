@@ -155,10 +155,13 @@ class _StudentTaskListPageState extends ConsumerState<StudentTaskListPage> {
             ),
           ),
           Expanded(
-            child: _kelasId == null
-                ? const Center(child: Text('Pilih kelas'))
-                : FutureBuilder<List<Tugas>>(
-                    future: _fetchTugas(),
+            child: Consumer(
+              builder: (ctx2, ref2, _) {
+                final kelasAsync2 = ref2.watch(kelasListProvider);
+                final eff = kelasAsync2.maybeWhen(data: (list) => list.isEmpty ? _kelasId : (_kelasId ?? list.first.id), orElse: () => _kelasId);
+                if (eff == null) return const Center(child: Text('Pilih kelas'));
+                return FutureBuilder<List<Tugas>>(
+                    future: _fetchTugas(eff),
                     builder: (ctx, snap) {
                       if (snap.connectionState == ConnectionState.waiting) return const LoadingView();
                       if (snap.hasError) return ErrorState(message: snap.error.toString(), onRetry: () => setState(() {}));
@@ -178,7 +181,9 @@ class _StudentTaskListPageState extends ConsumerState<StudentTaskListPage> {
                         itemBuilder: (ctx, i) => _TugasCard(tugas: data[i], onTap: () => context.push('/siswa/tugas/${data[i].id}')),
                       );
                     },
-                  ),
+                  );
+              },
+            ),
           ),
         ],
       ),
@@ -194,12 +199,12 @@ class _StudentTaskListPageState extends ConsumerState<StudentTaskListPage> {
     }
   }
 
-  Future<List<Tugas>> _fetchTugas() async {
+  Future<List<Tugas>> _fetchTugas(String effKelasId) async {
     if (SupabaseConfig.isNotConfigured) return [];
     try {
       final identity = ref.read(studentIdentityProvider);
       final repo = TugasRepository();
-      return await repo.fetchAll(kelasId: _kelasId, search: _search.isEmpty ? null : _search, mapelId: _filterMapelId, siswaId: identity.siswaId);
+      return await repo.fetchAll(kelasId: effKelasId, search: _search.isEmpty ? null : _search, mapelId: _filterMapelId, siswaId: identity.siswaId);
     } catch (_) {
       return [];
     }

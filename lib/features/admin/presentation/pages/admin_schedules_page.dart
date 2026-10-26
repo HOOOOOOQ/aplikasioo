@@ -41,8 +41,10 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     setState(() { _loading = true; _error = null; });
     try {
       final d = await JadwalRepository().fetchAll(kelasId: _filterKelas, hari: _filterHari);
+      if (!mounted) return;
       setState(() { _list = d; _loading = false; });
     } catch (e) {
+      if (!mounted) return;
       setState(() { _loading = false; _error = e.toString(); });
     }
   }
@@ -107,7 +109,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
           ElevatedButton(onPressed: () {
             final timeErr = Validators.timeRange(jamMulaiC.text, jamSelesaiC.text);
             if (timeErr != null) { ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(timeErr))); return; }
-            if (formKey.currentState!.validate()) Navigator.pop(ctx, true);
+            if (formKey.currentState?.validate() ?? false) Navigator.pop(ctx, true);
           }, child: Text(existing == null ? 'Tambah' : 'Simpan')),
         ],
       ),
@@ -182,7 +184,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                               final j = _list[i];
                               return Card(
                                 child: ListTile(
-                                  leading: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), decoration: BoxDecoration(color: AppColors.primaryContainer, borderRadius: BorderRadius.circular(8)), child: Text(j.hari.substring(0, 3), style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 11))),
+                                  leading: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), decoration: BoxDecoration(color: AppColors.primaryContainer, borderRadius: BorderRadius.circular(8)), child: Text(j.hari.length >= 3 ? j.hari.substring(0, 3) : j.hari, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 11))),
                                   title: Text('${j.mataPelajaranNama ?? "-"} • ${AppDateUtils.formatJamFromString(j.jamMulai)}-${AppDateUtils.formatJamFromString(j.jamSelesai)}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                                   subtitle: Text('${j.kelasNama ?? "-"} • ${j.guruNama ?? "-"} • ${j.ruang ?? "-"}', style: const TextStyle(fontSize: 12)),
                                   trailing: PopupMenuButton(

@@ -24,7 +24,8 @@ class SiswaRepository {
   }
 
   Future<Siswa> create({required String nomorInduk, required String nama, String? kelasId, String? kodeAkses}) async {
-    final c = SupabaseService.client;
+    final c = SupabaseService.tryClient;
+    if (c == null) throw Exception('Supabase belum dikonfigurasi — atur SUPABASE_URL/ANON_KEY');
     final payload = {
       'nomor_induk': nomorInduk,
       'nama': nama,
@@ -36,13 +37,16 @@ class SiswaRepository {
   }
 
   Future<Siswa> update(String id, Map<String, dynamic> patch) async {
-    final c = SupabaseService.client;
+    final c = SupabaseService.tryClient;
+    if (c == null) throw Exception('Supabase belum dikonfigurasi — atur SUPABASE_URL/ANON_KEY');
     final res = await c.from('siswa').update(patch).eq('id', id).select('*, kelas(nama_kelas)').single();
     return Siswa.fromJson(res);
   }
 
   Future<void> delete(String id) async {
-    await SupabaseService.client.from('siswa').delete().eq('id', id);
+    final _guard = SupabaseService.tryClient;
+    if (_guard == null) throw Exception('Supabase belum dikonfigurasi');
+    await _guard.from('siswa').delete().eq('id', id);
   }
 
   Future<Siswa?> findByKode(String kode) async {

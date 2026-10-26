@@ -37,8 +37,10 @@ class _AdminTeachersPageState extends ConsumerState<AdminTeachersPage> {
       final c = SupabaseService.tryClient;
       if (c == null) throw Exception('Supabase belum siap');
       final data = await c.from('profiles').select().eq('role', 'guru').order('full_name');
+      if (!mounted) return;
       setState(() { _list = (data as List).cast<Map<String, dynamic>>(); _loading = false; });
     } catch (e) {
+      if (!mounted) return;
       setState(() { _loading = false; _error = e.toString(); });
     }
   }
@@ -71,7 +73,7 @@ class _AdminTeachersPageState extends ConsumerState<AdminTeachersPage> {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
-          ElevatedButton(onPressed: () { if (formKey.currentState!.validate()) Navigator.pop(ctx, true); }, child: const Text('Undang')),
+          ElevatedButton(onPressed: () { if (formKey.currentState?.validate() ?? false) Navigator.pop(ctx, true); }, child: const Text('Undang')),
         ],
       ),
     );

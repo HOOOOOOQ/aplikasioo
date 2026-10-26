@@ -44,7 +44,7 @@ class TugasRepository {
               createdAt: t.createdAt,
               updatedAt: t.updatedAt,
               statusSiswa: (st as Map)['status'] as String?,
-              selesaiPada: st['selesai_pada'] != null ? DateTime.parse(st['selesai_pada'] as String) : null,
+              selesaiPada: st['selesai_pada'] != null ? DateTime.tryParse(st['selesai_pada'] as String) : null,
             );
           }
           return t;
@@ -88,7 +88,7 @@ class TugasRepository {
             createdAt: tugas.createdAt,
             updatedAt: tugas.updatedAt,
             statusSiswa: (st as Map)['status'] as String?,
-            selesaiPada: st['selesai_pada'] != null ? DateTime.parse(st['selesai_pada'] as String) : null,
+            selesaiPada: st['selesai_pada'] != null ? DateTime.tryParse(st['selesai_pada'] as String) : null,
           );
         }
       }
@@ -99,19 +99,23 @@ class TugasRepository {
   }
 
   Future<Tugas> create(Map<String, dynamic> payload) async {
-    final c = SupabaseService.client;
+    final c = SupabaseService.tryClient;
+    if (c == null) throw Exception('Supabase belum dikonfigurasi — atur SUPABASE_URL/ANON_KEY');
     final res = await c.from('tugas').insert(payload).select('*, kelas(nama_kelas), mata_pelajaran(nama_mapel), profiles!tugas_guru_id_fkey(full_name)').single();
     return Tugas.fromJson(res);
   }
 
   Future<Tugas> update(String id, Map<String, dynamic> patch) async {
-    final c = SupabaseService.client;
+    final c = SupabaseService.tryClient;
+    if (c == null) throw Exception('Supabase belum dikonfigurasi — atur SUPABASE_URL/ANON_KEY');
     final res = await c.from('tugas').update(patch).eq('id', id).select('*, kelas(nama_kelas), mata_pelajaran(nama_mapel), profiles!tugas_guru_id_fkey(full_name)').single();
     return Tugas.fromJson(res);
   }
 
   Future<void> delete(String id) async {
-    await SupabaseService.client.from('tugas').delete().eq('id', id);
+    final _guard = SupabaseService.tryClient;
+    if (_guard == null) throw Exception('Supabase belum dikonfigurasi');
+    await _guard.from('tugas').delete().eq('id', id);
   }
 
   Future<List<StatusTugasSiswa>> fetchStatusForTugas(String tugasId) async {
@@ -143,7 +147,8 @@ class TugasRepository {
   }
 
   Future<void> updateStudentStatusViaFunction({required String tugasId, required String siswaId, required String status, required String token}) async {
-    final c = SupabaseService.client;
+    final c = SupabaseService.tryClient;
+    if (c == null) throw Exception('Supabase belum dikonfigurasi — atur SUPABASE_URL/ANON_KEY');
     try {
       await c.functions.invoke('update-student-task-status', body: {
         'tugas_id': tugasId,
@@ -162,7 +167,9 @@ class TugasRepository {
   }
 
   Future<void> updateStatusDirect({required String tugasId, required String siswaId, required String status}) async {
-    await SupabaseService.client.from('status_tugas_siswa').upsert({
+    final _guard = SupabaseService.tryClient;
+    if (_guard == null) throw Exception('Supabase belum dikonfigurasi');
+    await _guard.from('status_tugas_siswa').upsert({
       'tugas_id': tugasId,
       'siswa_id': siswaId,
       'status': status,
@@ -171,7 +178,8 @@ class TugasRepository {
   }
 
   Future<String?> uploadLampiran({required String fileName, required List<int> bytes}) async {
-    final c = SupabaseService.client;
+    final c = SupabaseService.tryClient;
+    if (c == null) throw Exception('Supabase belum dikonfigurasi — atur SUPABASE_URL/ANON_KEY');
     final path = '${DateTime.now().millisecondsSinceEpoch}_$fileName';
     await c.storage.from('lampiran-tugas').uploadBinary(path, Uint8List.fromList(bytes));
     return path;

@@ -17,10 +17,11 @@ class EduTaskApp extends ConsumerWidget {
       theme: AppTheme.lightTheme,
       routerConfig: router,
       builder: (context, child) {
+        final safeChild = child ?? const SizedBox.shrink();
         if (SupabaseConfig.isNotConfigured) {
           return Stack(
             children: [
-              child!,
+              safeChild,
               Positioned(
                 top: 0,
                 left: 0,
@@ -36,7 +37,7 @@ class EduTaskApp extends ConsumerWidget {
             ],
           );
         }
-        return child!;
+        return safeChild;
       },
     );
   }

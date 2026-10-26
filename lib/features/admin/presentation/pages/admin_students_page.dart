@@ -40,8 +40,10 @@ class _AdminStudentsPageState extends ConsumerState<AdminStudentsPage> {
     setState(() { _loading = true; _error = null; });
     try {
       final data = await SiswaRepository().fetchAll(kelasId: _kelasFilter, search: _search);
+      if (!mounted) return;
       setState(() { _list = data; _loading = false; });
     } catch (e) {
+      if (!mounted) return;
       setState(() { _loading = false; _error = e.toString(); });
     }
   }
@@ -83,7 +85,7 @@ class _AdminStudentsPageState extends ConsumerState<AdminStudentsPage> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
           ElevatedButton(onPressed: () {
-            if (formKey.currentState!.validate()) Navigator.pop(ctx, true);
+            if (formKey.currentState?.validate() ?? false) Navigator.pop(ctx, true);
           }, child: Text(existing == null ? 'Tambah' : 'Simpan')),
         ],
       ),

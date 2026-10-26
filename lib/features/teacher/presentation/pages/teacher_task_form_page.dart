@@ -45,9 +45,11 @@ class _TeacherTaskFormPageState extends State<TeacherTaskFormPage> {
   }
 
   Future<void> _loadExisting() async {
+    if (!mounted) return;
     setState(() => _initialLoading = true);
     try {
       final t = await TugasRepository().fetchById(widget.taskId!);
+      if (!mounted) return;
       if (t != null) {
         _judulC.text = t.judul;
         _deskripsiC.text = t.deskripsi;
@@ -58,6 +60,7 @@ class _TeacherTaskFormPageState extends State<TeacherTaskFormPage> {
         _lampiranPath = t.lampiranPath;
       }
     } catch (_) {}
+    if (!mounted) return;
     setState(() => _initialLoading = false);
   }
 
@@ -74,14 +77,20 @@ class _TeacherTaskFormPageState extends State<TeacherTaskFormPage> {
       if (mounted) showAppSnackBar(context, 'Ekstensi tidak diizinkan', isError: true);
       return;
     }
+    final bytes = file.bytes;
+    if (bytes == null) {
+      if (mounted) showAppSnackBar(context, 'Gagal membaca file', isError: true);
+      return;
+    }
+    if (!mounted) return;
     setState(() {
-      _lampiranBytes = file.bytes;
+      _lampiranBytes = bytes;
       _lampiranName = name;
     });
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!(_formKey.currentState?.validate() ?? false)) return;
     final dateErr = Validators.dateRange(_tanggalMulai, _tenggat);
     if (dateErr != null) {
       showAppSnackBar(context, dateErr, isError: true);
@@ -94,12 +103,20 @@ class _TeacherTaskFormPageState extends State<TeacherTaskFormPage> {
         content: const Text('Pastikan data sudah benar sebelum menyimpan.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Simpan')),
+          ElevatedButton(onPressed: () {
+            if (!(formKey.currentState?.validate() ?? false)) return;
+            final dateErr2 = Validators.dateRange(_tanggalMulai, _tenggat);
+            if (dateErr2 != null) { ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(dateErr2))); return; }
+            Navigator.pop(ctx, true);
+          }, child: const Text('Simpan')),
         ],
       ),
     );
+    // sudah divalidasi di dialog, validasi ringan ulang
+    if (!mounted) return;
     if (confirm != true) return;
-
+    // FIX penempatan script salah: cek mounted sebelum setState (hindari FC)
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       String? lampiranPath = _lampiranPath;
