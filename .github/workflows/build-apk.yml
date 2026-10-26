@@ -338,19 +338,41 @@ jobs:
           } > RELEASE_NOTES.md
           cat RELEASE_NOTES.md
 
+      # Publikasi dibuat tahan gangguan: unggah ulang dicoba beberapa kali dan
+      # kegagalan publikasi tidak membatalkan langkah artefak di bawahnya
+      # (APK tetap bisa diunduh dari tab Artifacts bila Release bermasalah).
       - name: Publikasikan APK ke GitHub Release
         if: github.event_name != 'pull_request' && success()
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          upload_with_retry() {
+            for attempt in 1 2 3; do
+              echo "Unggah aset release (percobaan ${attempt})…"
+              if gh release upload latest-apk dist/*.apk SHA256SUMS.txt --clobber; then
+                return 0
+              fi
+              sleep 10
+            done
+            return 1
+          }
+
           if gh release view latest-apk > /dev/null 2>&1; then
-            gh release upload latest-apk dist/*.apk SHA256SUMS.txt --clobber
-            gh release edit latest-apk --title "EduTask APK terbaru (build #${GITHUB_RUN_NUMBER})" --notes-file RELEASE_NOTES.md
+            upload_with_retry || echo "::warning::Unggah aset release gagal setelah 3 percobaan"
+            gh release edit latest-apk --title "EduTask APK terbaru (build #${GITHUB_RUN_NUMBER})" --notes-file RELEASE_NOTES.md \
+              || echo "::warning::Gagal memperbarui judul/catatan release"
           else
-            gh release create latest-apk dist/*.apk SHA256SUMS.txt \
-              --title "EduTask APK terbaru (build #${GITHUB_RUN_NUMBER})" \
-              --notes-file RELEASE_NOTES.md
+            for attempt in 1 2 3; do
+              if gh release create latest-apk dist/*.apk SHA256SUMS.txt \
+                --title "EduTask APK terbaru (build #${GITHUB_RUN_NUMBER})" \
+                --notes-file RELEASE_NOTES.md; then
+                break
+              fi
+              echo "Pembuatan release gagal, coba lagi…"
+              sleep 10
+            done
           fi
           echo "Rilis: https://github.com/${GITHUB_REPOSITORY}/releases/tag/latest-apk"
 
