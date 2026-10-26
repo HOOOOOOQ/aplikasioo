@@ -89,15 +89,10 @@ class _StudentMainPageState extends ConsumerState<StudentMainPage> {
           if (kelasList.isEmpty) {
             return const EmptyState(icon: Icons.class_outlined, title: 'Belum Ada Kelas', subtitle: 'Admin belum menambahkan data kelas. Hubungi admin sekolah.');
           }
-          // Auto-select first if none
-          if (_selectedKelasId == null && kelasList.isNotEmpty) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              setState(() {
-                _selectedKelasId = kelasList.first.id;
-                _selectedKelasNama = kelasList.first.namaKelas;
-              });
-            });
-          }
+          // FIX: jangan panggil addPostFrameCallback di dalam build (penempatan script salah → infinite loop → FC)
+          // Gunakan computed value tanpa setState. Efek samping di-build dilarang.
+          final effectiveKelasId = _selectedKelasId ?? kelasList.first.id;
+          final effectiveKelasNama = _selectedKelasNama ?? kelasList.first.namaKelas;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
@@ -156,7 +151,7 @@ class _StudentMainPageState extends ConsumerState<StudentMainPage> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _selectedKelasId,
+                        value: effectiveKelasId,
                         decoration: InputDecoration(contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
                         items: kelasList.map((k) => DropdownMenuItem(value: k.id, child: Text(k.namaKelas, style: const TextStyle(fontSize: 13)))).toList(),
                         onChanged: (v) {
@@ -173,11 +168,9 @@ class _StudentMainPageState extends ConsumerState<StudentMainPage> {
                 ),
                 const SizedBox(height: 16),
 
-                if (_selectedKelasId != null) ...[
-                  _buildJadwalHariIni(_selectedKelasId!),
-                  const SizedBox(height: 16),
-                  _buildTugasTerbaru(_selectedKelasId!),
-                ],
+                _buildJadwalHariIni(effectiveKelasId),
+                const SizedBox(height: 16),
+                _buildTugasTerbaru(effectiveKelasId),
               ],
             ),
           );
