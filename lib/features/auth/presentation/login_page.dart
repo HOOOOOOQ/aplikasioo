@@ -50,6 +50,15 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         await ref.read(authControllerProvider.notifier).signOut();
         return;
       }
+      // Penting: segarkan state global SEBELUM navigasi, lalu tunggu sampai selesai.
+      // Tanpa ini router masih melihat profil lama (null) dan bisa melempar balik ke /login.
+      ref.invalidate(currentUserProvider);
+      try {
+        await ref.read(currentUserProvider.future);
+      } catch (_) {
+        // kalau gagal, tetap lanjut: halaman tujuan akan menampilkan error sendiri
+      }
+      if (!mounted) return;
       if (user.role == UserRole.admin) {
         context.go('/admin');
       } else if (user.role == UserRole.guru) {

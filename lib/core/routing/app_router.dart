@@ -48,6 +48,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final isLoggedIn = user != null;
       final role = user?.role;
 
+      // Saat profil masih dimuat (mis. tepat setelah login), JANGAN redirect ke /login:
+      // sebelumnya ini menyebabkan user yang baru berhasil login terlempar balik ke halaman login.
+      if (authAsync.isLoading && user == null) {
+        return null;
+      }
+
       // Auth protected routes
       if (loc.startsWith('/admin')) {
         if (!isLoggedIn) return '/login';

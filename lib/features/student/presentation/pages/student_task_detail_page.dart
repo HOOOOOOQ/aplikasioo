@@ -11,6 +11,7 @@ import '../../../../core/config/supabase_config.dart';
 import '../../../../shared/repositories/tugas_repository.dart';
 import '../../../../shared/models/tugas.dart';
 import '../../identity/student_identity_provider.dart';
+import '../../../notifications/notification_service.dart';
 
 class StudentTaskDetailPage extends ConsumerStatefulWidget {
   final String taskId;
@@ -66,6 +67,12 @@ class _StudentTaskDetailPageState extends ConsumerState<StudentTaskDetailPage> {
         await repo.updateStudentStatusViaFunction(tugasId: tugas.id, siswaId: identity.siswaId!, status: newStatus, token: identity.token!);
       } else {
         await repo.updateStatusDirect(tugasId: tugas.id, siswaId: identity.siswaId!, status: newStatus);
+      }
+      // Selesai -> batalkan pengingat; belum selesai -> jadwalkan ulang.
+      if (newStatus == 'selesai') {
+        await NotificationService.cancelForTugas(tugas.id);
+      } else {
+        await NotificationService.scheduleForTugas(tugas);
       }
       if (mounted) {
         showAppSnackBar(context, newStatus == 'selesai' ? 'Tugas ditandai selesai' : 'Tugas ditandai belum selesai');
