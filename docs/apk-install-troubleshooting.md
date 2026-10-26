@@ -57,8 +57,8 @@ Aplikasi seperti *Hash Droid* / Termux:
 ```
 sha256sum EduTask-1.0.0-arm64-v8a.apk
 ```
-Bandingkan dengan isi `SHA256SUMS.txt` di halaman Release. Jika berbeda → unduhan korup,
-unduh ulang.
+Bandingkan dengan isi `SHA256SUMS.txt` di halaman Release (format siap pakai:
+`sha256sum -c SHA256SUMS.txt`). Jika berbeda → unduhan korup, unduh ulang.
 
 ---
 
