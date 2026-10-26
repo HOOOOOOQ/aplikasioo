@@ -157,13 +157,18 @@ class TugasRepository {
         'status': status,
         'token': token,
       });
-    } catch (e) {
-      await c.from('status_tugas_siswa').upsert({
-        'tugas_id': tugasId,
-        'siswa_id': siswaId,
-        'status': status,
-        'selesai_pada': status == 'selesai' ? DateTime.now().toIso8601String() : null,
-      }, onConflict: 'tugas_id,siswa_id');
+    } on FunctionException catch (e) {
+      // Fallback HANYA untuk kondisi teknis (function belum dideploy / gangguan jaringan).
+      // Jika server MENOLAK (401/403/400), jangan bypass: itu berarti token/kelas tidak valid.
+      if (e.status == 404 || e.status == 0 || e.status >= 500) {
+        await updateStatusDirect(tugasId: tugasId, siswaId: siswaId, status: status);
+        return;
+      }
+      final detail = e.details is Map ? (e.details as Map)['error'] : null;
+      throw Exception(
+        'Server menolak perubahan status (HTTP ${e.status})'
+        '${detail != null ? ': $detail' : ''}. Verifikasi ulang kode siswa Anda.',
+      );
     }
   }
 

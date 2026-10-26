@@ -22,6 +22,18 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0.0'
 }
 
+// Signing release:
+// 1) Jika android/key.properties ada (dibuat CI dari GitHub Secrets / lokal), pakai itu.
+// 2) Jika tidak ada, pakai keystore test yang di-commit (android/app/edutask-signing.p12)
+//    supaya signature ANTAR BUILD SELALU SAMA -> APK baru bisa menimpa APK lama.
+//    Keystore ini BUKAN untuk Play Store; ganti lewat key.properties untuk produksi.
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+def hasKeystoreProperties = keystorePropertiesFile.exists()
+if (hasKeystoreProperties) {
+    keystorePropertiesFile.withReader('UTF-8') { reader -> keystoreProperties.load(reader) }
+}
+
 android {
     namespace "com.edutask.sekolah"
     compileSdk 36
@@ -41,6 +53,30 @@ android {
         main.java.srcDirs += 'src/main/kotlin'
     }
 
+    signingConfigs {
+        release {
+            if (hasKeystoreProperties) {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                storeType keystoreProperties['storeType'] ?: 'PKCS12'
+            } else {
+                storeFile rootProject.file('app/edutask-signing.p12')
+                storePassword 'edutask2026'
+                keyAlias 'edutask'
+                keyPassword 'edutask2026'
+                storeType 'PKCS12'
+            }
+            // Semua skema tanda tangan aktif: APK tetap bisa diparse/diinstal
+            // di Android 5 (v1) sampai Android 14+ (v2/v3). Ini yang mencegah
+            // "Ada masalah saat mengurai paket" pada perangkat lama.
+            enableV1Signing true
+            enableV2Signing true
+            enableV3Signing true
+        }
+    }
+
     defaultConfig {
         applicationId "com.edutask.sekolah"
         minSdk 21
@@ -52,11 +88,19 @@ android {
 
     buildTypes {
         release {
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             minifyEnabled false
             shrinkResources false
         }
+        debug {
+            // Debug tetap pakai debug key supaya bisa dipasang berdampingan saat development.
+            signingConfig signingConfigs.debug
+        }
     }
+
+    // Catatan: JANGAN memaksa `jniLibs.useLegacyPackaging = false`.
+    // Dengan minSdk 21, AGP menulis extractNativeLibs=false yang tidak didukung
+    // Android 5/6 sehingga APK bisa gagal dipasang/dijalankan di perangkat lama.
 }
 
 flutter {

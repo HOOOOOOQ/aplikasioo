@@ -94,6 +94,8 @@ supabase/.temp/
 
 # Keystore
 *.p12
+# Pengecualian: keystore TEST untuk build sideload (bukan Play Store)
+!android/app/edutask-signing.p12
 *.key
 *.mobileprovision
 

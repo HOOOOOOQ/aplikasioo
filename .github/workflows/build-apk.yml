@@ -1,5 +1,11 @@
 name: Build EduTask APK
 
+# Alur:
+#  1. build  -> build universal + split-per-abi, VALIDASI APK (aapt/apksigner/zipalign),
+#               publikasikan ke GitHub Release (file .apk mentah, bukan zip artifact),
+#               unggah artifact untuk job instalasi.
+#  2. install-test -> emulator Android x86_64: install APK, cold start, cek logcat.
+
 on:
   push:
     branches:
@@ -10,13 +16,18 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
   issues: write
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     env:
       GRADLE_OPTS: -Xmx3g -Dorg.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8
@@ -25,20 +36,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Gradle 8.13 (untuk AGP 8.11, hindari Gradle 9 di runner)
+      - name: Setup Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.13
           cache-disabled: false
           gradle-home-cache-cleanup: true
 
-      - name: Setup Flutter 3.35.4 (kompatibel intl 0.20.2 + AGP 8.11)
+      - name: Setup Flutter 3.35.4
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.35.4'
@@ -49,90 +60,295 @@ jobs:
         run: flutter --version
 
       - name: Install dependencies
-        run: |
-          flutter pub get 2>&1 | tee pubget.log
-          cat pubget.log
+        run: flutter pub get
 
-      - name: Analyze code
-        run: flutter analyze || echo "analyze selesai (warnings diabaikan)"
+      - name: Analyze code (fatal on errors)
+        id: analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Run tests
-        run: flutter test || echo "test selesai"
+        run: flutter test
 
-      # Build APK - otomatis pakai Secrets jika kamu sudah set di GitHub
-      # Cara set: Repo Settings -> Secrets and variables -> Actions -> New repository secret
-      # Tambah: SUPABASE_URL dan SUPABASE_ANON_KEY (isi sb_publishable_...)
-      # Jika belum set, build tetap jalan tapi app jadi mode demo (tanpa data)
-      - name: Build release APK (verbose log)
+      # Keystore release: pakai secret jika ada, jika tidak pakai keystore test
+      # yang di-commit (signature stabil antar build).
+      - name: Siapkan keystore release
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          set -o pipefail
-          if [ -n "${{ secrets.SUPABASE_URL }}" ] && [ -n "${{ secrets.SUPABASE_ANON_KEY }}" ]; then
-            echo "Building dengan Supabase Secrets..."
-            flutter build apk --release --verbose --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} 2>&1 | tee build-apk.log
+          set -euo pipefail
+          if [ -n "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+            echo "Memakai keystore dari GitHub Secrets."
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/upload-release.jks
+            {
+              echo "storeFile=upload-release.jks"
+              echo "storePassword=${ANDROID_KEYSTORE_PASSWORD}"
+              echo "keyAlias=${ANDROID_KEY_ALIAS}"
+              echo "keyPassword=${ANDROID_KEY_PASSWORD}"
+              echo "storeType=JKS"
+            } > android/key.properties
           else
-            echo "Secrets belum di-set, build mode demo..."
-            flutter build apk --release --verbose 2>&1 | tee build-apk.log
+            echo "::notice::Secret ANDROID_KEYSTORE_BASE64 tidak ada — memakai keystore test yang di-commit (android/app/edutask-signing.p12). Signature stabil, tapi ganti untuk Play Store."
           fi
 
-      - name: Upload build & pubget logs (always)
+      - name: Build universal release APK
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          DEFINES=""
+          if [ -n "${SUPABASE_URL:-}" ] && [ -n "${SUPABASE_ANON_KEY:-}" ]; then
+            echo "Build dengan Supabase Secrets."
+            DEFINES="--dart-define=SUPABASE_URL=${SUPABASE_URL} --dart-define=SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}"
+          else
+            echo "::warning::Secrets SUPABASE_URL/SUPABASE_ANON_KEY kosong — APK akan berjalan mode demo."
+          fi
+          flutter build apk --release --build-number=${GITHUB_RUN_NUMBER} $DEFINES 2>&1 | tee build-apk.log
+          mkdir -p dist
+          VERSION=$(grep -m1 '^version:' pubspec.yaml | sed 's/version: *//; s/\+.*//' | tr -d '[:space:]')
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/EduTask-${VERSION}-universal.apk"
+
+      - name: Build split-per-abi release APKs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          DEFINES=""
+          if [ -n "${SUPABASE_URL:-}" ] && [ -n "${SUPABASE_ANON_KEY:-}" ]; then
+            DEFINES="--dart-define=SUPABASE_URL=${SUPABASE_URL} --dart-define=SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}"
+          fi
+          flutter build apk --release --split-per-abi --build-number=${GITHUB_RUN_NUMBER} $DEFINES 2>&1 | tee build-apk-split.log
+          for abi in armeabi-v7a arm64-v8a x86_64; do
+            src="build/app/outputs/flutter-apk/app-${abi}-release.apk"
+            if [ -f "$src" ]; then
+              cp "$src" "dist/EduTask-${VERSION}-${abi}.apk"
+            else
+              echo "::error::APK untuk ABI $abi tidak ditemukan ($src)"
+              exit 1
+            fi
+          done
+          ls -lh dist
+
+      # ===== VALIDASI APK: bukti bahwa file benar-benar APK yang sah =====
+      - name: Validasi APK (integritas, manifest, signature, aligment)
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS=$(ls -d "$ANDROID_SDK_ROOT"/build-tools/* | sort -V | tail -1)
+          echo "BUILD_TOOLS=$BUILD_TOOLS"
+          AAPT="$BUILD_TOOLS/aapt"
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+          ZIPALIGN="$BUILD_TOOLS/zipalign"
+          FAIL=0
+
+          for apk in dist/*.apk; do
+            echo "================ $apk ================"
+            ls -l "$apk"
+            file "$apk"
+            sha256sum "$apk" | tee -a SHA256SUMS.txt
+
+            # 1) ZIP/APK tidak korup
+            if ! unzip -t "$apk" > /tmp/unzip_test.txt 2>&1; then
+              echo "::error::$apk gagal uji integritas ZIP"; tail -5 /tmp/unzip_test.txt; FAIL=1; continue
+            fi
+            echo "ZIP OK: $(grep -c 'testing:' /tmp/unzip_test.txt) entri"
+
+            # 2) AndroidManifest bisa diparse + package/sdk benar
+            "$AAPT" dump badging "$apk" > /tmp/badging.txt 2>&1 || { echo "::error::aapt gagal membaca $apk"; cat /tmp/badging.txt; FAIL=1; continue; }
+            head -1 /tmp/badging.txt
+            PKG=$(grep -m1 "^package:" /tmp/badging.txt | sed "s/.*name='\([^']*\)'.*/\1/")
+            echo "package=$PKG"
+            grep -m1 "sdkVersion" /tmp/badging.txt || true
+            grep -m1 "targetSdkVersion" /tmp/badging.txt || true
+            grep -m1 "native-code" /tmp/badging.txt || echo "native-code: (tidak ada)"
+
+            if [ "$PKG" != "com.edutask.sekolah" ]; then
+              echo "::error::package name salah: $PKG"; FAIL=1
+            fi
+
+            # 3) Signature: v1 harus ada untuk Android 5/6 (minSdk 21)
+            "$APKSIGNER" verify --verbose --print-certs "$apk" > /tmp/sign.txt 2>&1 || { echo "::error::signature TIDAK valid: $apk"; cat /tmp/sign.txt; FAIL=1; continue; }
+            grep -E "^Verified using" /tmp/sign.txt
+            grep -E "Signer #1 certificate SHA-256" /tmp/sign.txt || true
+            if ! grep -q "v1 scheme (JAR signing): true" /tmp/sign.txt; then
+              echo "::error::$apk tidak punya signature v1 (akan gagal diinstal di Android 5/6)"
+              FAIL=1
+            fi
+
+            # 4) zipalign (4-byte)
+            if ! "$ZIPALIGN" -c -v 4 "$apk" > /tmp/align.txt 2>&1; then
+              echo "::warning::$apk tidak zipalign 4-byte"; tail -3 /tmp/align.txt
+            else
+              echo "zipalign: OK"
+            fi
+          done
+
+          if [ "$FAIL" -ne 0 ]; then
+            echo "::error::Validasi APK GAGAL — lihat pesan di atas."
+            exit 1
+          fi
+          echo "================ RINGKASAN ================"
+          ls -l dist
+          cat SHA256SUMS.txt
+
+      - name: Tulis catatan rilis
+        if: success()
+        run: |
+          set -euo pipefail
+          {
+            echo "Build otomatis dari commit \`${GITHUB_SHA:0:7}\` (run #${GITHUB_RUN_NUMBER})."
+            echo ""
+            echo "**Pilih file:**"
+            echo "- \`EduTask-${VERSION}-arm64-v8a.apk\` — untuk hampir semua HP Android modern (paling kecil, disarankan)."
+            echo "- \`EduTask-${VERSION}-armeabi-v7a.apk\` — HP lama 32-bit."
+            echo "- \`EduTask-${VERSION}-universal.apk\` — semua ABI dalam satu file (paling besar, paling kompatibel)."
+            echo ""
+            echo "**Cara pasang:** unduh file \`.apk\` langsung ke HP, buka dari Notifikasi/Files, izinkan \"Install unknown apps\"."
+            echo "Jika sebelumnya sudah terpasang build dengan tanda tangan berbeda, uninstall dulu aplikasi lamanya."
+            echo ""
+            echo "**SHA-256:**"
+            echo '```'
+            cat SHA256SUMS.txt
+            echo '```'
+            echo ""
+            echo "Catatan: build ini memakai keystore test (bukan Play Store) kecuali secret \`ANDROID_KEYSTORE_BASE64\` diatur."
+          } > RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+
+      - name: Publikasikan APK ke GitHub Release
+        if: github.event_name != 'pull_request' && success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh release view latest-apk > /dev/null 2>&1; then
+            gh release upload latest-apk dist/*.apk SHA256SUMS.txt --clobber
+            gh release edit latest-apk --title "EduTask APK terbaru (build #${GITHUB_RUN_NUMBER})" --notes-file RELEASE_NOTES.md
+          else
+            gh release create latest-apk dist/*.apk SHA256SUMS.txt \
+              --title "EduTask APK terbaru (build #${GITHUB_RUN_NUMBER})" \
+              --notes-file RELEASE_NOTES.md
+          fi
+          echo "Rilis: https://github.com/${GITHUB_REPOSITORY}/releases/tag/latest-apk"
+
+      - name: Upload build log (always)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-log
           path: |
             build-apk.log
-            pubget.log
+            build-apk-split.log
           if-no-files-found: warn
           retention-days: 7
 
-      - name: Create Issue with build log on failure
-        if: failure()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            let log = '';
-            try { log = fs.readFileSync('build-apk.log', 'utf8'); } catch(e) { log = 'no log file ' + e; }
-            let dartErr = '';
-            const wIdx = log.indexOf('* What went wrong');
-            if (wIdx >= 0) {
-              // 12k sebelum What went wrong biasanya berisi error Flutter/Dart
-              dartErr = log.slice(Math.max(0, wIdx-12000), wIdx);
-            } else {
-              dartErr = log.slice(-12000);
-            }
-            let snippet = '';
-            if (wIdx >= 0) snippet = log.slice(wIdx, wIdx + 4000);
-            const tail = log.slice(-5000);
-            const parts = [];
-            if (dartErr) parts.push('---DART/FLUTTER LOG (12k sebelum What went wrong)---\n' + dartErr);
-            if (snippet) parts.push('---GRADLE What went wrong---\n' + snippet);
-            parts.push('---TAIL---\n' + tail);
-            const combined = parts.join('\n\n');
-            const title = `Build APK gagal #${context.runId}`;
-            const body = `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\nTail log (6000 chars):\n\n\`\`\`\n${combined}\n\`\`\``;
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: title,
-              body: body,
-              labels: ['bug']
-            });
-
-      - name: Append log to job summary (always)
-        if: always()
-        run: |
-          echo "### Build log — 12k sebelum What went wrong + tail" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          awk '/* What went wrong/{p=NR} NR>p-200 && NR<=p' build-apk.log | tail -c 6000 >> $GITHUB_STEP_SUMMARY || grep -A 30 "What went wrong" build-apk.log >> $GITHUB_STEP_SUMMARY || true
-          echo "---TAIL---" >> $GITHUB_STEP_SUMMARY
-          tail -c 4000 build-apk.log >> $GITHUB_STEP_SUMMARY || echo "no log" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload APK artifact
+      - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: edutask-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: edutask-apks
+          path: |
+            dist/*.apk
+            SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
+
+      - name: Ringkasan build
+        if: always()
+        run: |
+          {
+            echo "### EduTask APK build #${GITHUB_RUN_NUMBER}"
+            echo ""
+            echo "| Langkah | Status |"
+            echo "|---|---|"
+            echo "| Analyze | ${{ steps.analyze.outcome }} |"
+            echo ""
+            echo '```'
+            ls -l dist 2>/dev/null || echo "dist kosong"
+            cat SHA256SUMS.txt 2>/dev/null || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ===== UJI INSTALASI NYATA di emulator Android =====
+  install-test:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Ambil APK hasil build
+        uses: actions/download-artifact@v4
+        with:
+          name: edutask-apks
+          path: dist
+
+      - name: Enable KVM untuk emulator
+        run: |
+          sudo apt-get update -qq
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+
+      - name: Install APK di emulator + cold start + cek crash
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: |
+            set -e
+            APK=$(ls dist/*universal.apk | head -1)
+            echo "Menguji: $APK"
+            adb install -r "$APK"
+            adb shell pm list packages | grep com.edutask.sekolah
+            adb logcat -c
+            adb shell am start -W -n com.edutask.sekolah/.MainActivity | tee start.txt
+            grep -q "Status: ok" start.txt
+            sleep 15
+            adb shell dumpsys activity activities | grep -m1 "mResumedActivity" || true
+            adb logcat -d > logcat.txt || true
+            if grep -q "FATAL EXCEPTION" logcat.txt; then
+              echo "::error::Aplikasi crash saat start"
+              grep -B2 -A25 "FATAL EXCEPTION" logcat.txt
+              exit 1
+            fi
+            if ! adb shell pidof com.edutask.sekolah; then
+              echo "::error::Proses aplikasi tidak berjalan setelah start"
+              exit 1
+            fi
+            adb shell input keyevent 3
+            sleep 2
+            adb shell monkey -p com.edutask.sekolah -c android.intent.category.LAUNCHER 1 || true
+            sleep 5
+            adb logcat -d > logcat2.txt || true
+            if grep -q "FATAL EXCEPTION" logcat2.txt; then
+              echo "::error::Crash setelah relaunch"
+              grep -B2 -A25 "FATAL EXCEPTION" logcat2.txt
+              exit 1
+            fi
+            echo "APK berhasil diinstal, dibuka, dan tidak crash."
+
+      - name: Upload logcat
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: emulator-logcat
+          path: |
+            logcat.txt
+            logcat2.txt
+            start.txt
+          if-no-files-found: warn

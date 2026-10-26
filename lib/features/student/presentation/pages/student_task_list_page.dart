@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -15,6 +17,7 @@ import '../../../../shared/repositories/tugas_repository.dart';
 import '../../../../shared/models/mata_pelajaran.dart';
 import '../../../../core/config/supabase_config.dart';
 import '../../identity/student_identity_provider.dart';
+import '../../../notifications/notification_service.dart';
 import 'student_main_page.dart';
 
 class StudentTaskListPage extends ConsumerStatefulWidget {
@@ -26,6 +29,10 @@ class StudentTaskListPage extends ConsumerStatefulWidget {
 
 class _StudentTaskListPageState extends ConsumerState<StudentTaskListPage> {
   String? _kelasId;
+  // Future di-cache per kelas: sebelumnya future dibuat ulang setiap build,
+  // sehingga setiap ketikan di kolom cari memicu query ulang ke Supabase.
+  Future<List<Tugas>>? _tugasFuture;
+  String? _tugasFutureKey;
   String _search = '';
   String _filterStatus = 'Semua';
   String? _filterMapelId;
@@ -161,10 +168,10 @@ class _StudentTaskListPageState extends ConsumerState<StudentTaskListPage> {
                 final eff = kelasAsync2.maybeWhen(data: (list) => list.isEmpty ? _kelasId : (_kelasId ?? list.first.id), orElse: () => _kelasId);
                 if (eff == null) return const Center(child: Text('Pilih kelas'));
                 return FutureBuilder<List<Tugas>>(
-                    future: _fetchTugas(eff),
+                    future: _futureFor(eff),
                     builder: (ctx, snap) {
                       if (snap.connectionState == ConnectionState.waiting) return const LoadingView();
-                      if (snap.hasError) return ErrorState(message: snap.error.toString(), onRetry: () => setState(() {}));
+                      if (snap.hasError) return ErrorState(message: snap.error.toString(), onRetry: _refreshTugas);
                       var data = snap.data ?? [];
                       // Apply local filter status
                       data = _applyStatusFilter(data);
@@ -199,22 +206,52 @@ class _StudentTaskListPageState extends ConsumerState<StudentTaskListPage> {
     }
   }
 
+  Future<List<Tugas>> _futureFor(String effKelasId) {
+    // Key ikut menyertakan filter mapel & search supaya hasil tetap benar,
+    // tetapi future TIDAK dibuat ulang bila key sama (mis. rebuild karena setState lain).
+    final key = '$effKelasId|$_filterMapelId';
+    if (_tugasFutureKey == key && _tugasFuture != null) return _tugasFuture!;
+    _tugasFutureKey = key;
+    _tugasFuture = _fetchTugas(effKelasId);
+    return _tugasFuture!;
+  }
+
+  void _refreshTugas() {
+    setState(() {
+      _tugasFutureKey = null;
+      _tugasFuture = null;
+    });
+  }
+
   Future<List<Tugas>> _fetchTugas(String effKelasId) async {
     if (SupabaseConfig.isNotConfigured) return [];
     try {
       final identity = ref.read(studentIdentityProvider);
       final repo = TugasRepository();
-      return await repo.fetchAll(kelasId: effKelasId, search: _search.isEmpty ? null : _search, mapelId: _filterMapelId, siswaId: identity.siswaId);
+      // Pencarian dilakukan lokal (instan, tanpa query per ketikan).
+      final list = await repo.fetchAll(kelasId: effKelasId, search: null, mapelId: _filterMapelId, siswaId: identity.siswaId);
+      // Jadwalkan pengingat tenggat (permission diminta di sini, bukan saat startup).
+      unawaited(NotificationService.scheduleUpcoming(list));
+      return list;
     } catch (_) {
       return [];
     }
   }
 
   List<Tugas> _applyStatusFilter(List<Tugas> list) {
-    if (_filterStatus == 'Semua') return list;
+    final q = _search.trim().toLowerCase();
+    var filtered = list;
+    if (q.isNotEmpty) {
+      filtered = filtered.where((t) {
+        return t.judul.toLowerCase().contains(q) ||
+            (t.mataPelajaranNama ?? '').toLowerCase().contains(q) ||
+            (t.kelasNama ?? '').toLowerCase().contains(q);
+      }).toList();
+    }
+    if (_filterStatus == 'Semua') return filtered;
     final identity = ref.read(studentIdentityProvider);
     final locals = ref.read(localTaskStatusProvider);
-    return list.where((t) {
+    return filtered.where((t) {
       final isCompleted = identity.isIdentified ? t.isCompleted : (locals[t.id] == 'selesai');
       final status = DeadlineHelper.getStatus(deadline: t.tenggatWaktu, isCompleted: isCompleted);
       switch (_filterStatus) {

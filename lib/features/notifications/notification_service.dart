@@ -29,8 +29,42 @@ class NotificationService {
   }
 
   static Future<void> requestPermission() async {
-    final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-    await android?.requestNotificationsPermission();
+    try {
+      final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      // Android 13+ butuh izin runtime; kalau ditolak, fitur notifikasi mati tanpa crash.
+      await android?.requestNotificationsPermission();
+    } catch (_) {
+      // abaikan: perangkat/versi Android tidak mendukung
+    }
+  }
+
+  /// Minta izin sekali, lalu jadwalkan pengingat untuk tugas yang belum selesai.
+  /// Dipanggil dari halaman siswa (bukan saat startup) agar tidak mengganggu.
+  static Future<void> scheduleUpcoming(List<Tugas> tugasList) async {
+    try {
+      await init();
+      await _ensurePermissionOnce();
+      // Batasi jumlah agar tidak membanjiri scheduler OS.
+      var count = 0;
+      for (final t in tugasList) {
+        if (t.isCompleted) {
+          await cancelForTugas(t.id);
+          continue;
+        }
+        if (count >= 25) break;
+        await scheduleForTugas(t);
+        count++;
+      }
+    } catch (e) {
+      debugPrint('scheduleUpcoming gagal: $e');
+    }
+  }
+
+  static bool _permissionAsked = false;
+  static Future<void> _ensurePermissionOnce() async {
+    if (_permissionAsked) return;
+    _permissionAsked = true;
+    await requestPermission();
   }
 
   static Future<void> scheduleForTugas(Tugas tugas) async {
@@ -78,7 +112,14 @@ class NotificationService {
     try {
       await _plugin.zonedSchedule(id, title, body, tzDate, details, androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle, uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime);
     } catch (e) {
-      debugPrint('Schedule failed: $e');
+      // Android 14+ bisa menolak exact alarm (SCHEDULE_EXACT_ALARM tidak diberikan).
+      // Fallback ke inexact supaya pengingat tetap terjadwal, bukan gagal total.
+      debugPrint('Exact schedule gagal ($e), fallback inexact');
+      try {
+        await _plugin.zonedSchedule(id, title, body, tzDate, details, androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle, uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime);
+      } catch (e2) {
+        debugPrint('Schedule failed: $e2');
+      }
     }
   }
 

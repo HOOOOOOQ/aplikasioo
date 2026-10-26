@@ -68,9 +68,12 @@ class StudentIdentityNotifier extends StateNotifier<StudentIdentity> {
       // Try Edge Function first
       try {
         final res = await client.functions.invoke('student-access', body: {'kode_akses': kode});
-        final data = res.data;
-        if (data is Map<String, dynamic> && data['success'] == true) {
-          final siswa = data['siswa'] as Map<String, dynamic>;
+        final raw = res.data;
+        // Cast aman: jsonDecode bisa menghasilkan Map<dynamic, dynamic>.
+        if (raw is Map && raw['success'] == true) {
+          final data = Map<String, dynamic>.from(raw);
+          final siswa = data['siswa'] is Map ? Map<String, dynamic>.from(data['siswa'] as Map) : <String, dynamic>{};
+          if (siswa['id'] == null) return false;
           final token = data['token'] as String? ?? 'local-${DateTime.now().millisecondsSinceEpoch}';
           final sp = await SharedPreferences.getInstance();
           await sp.setString(AppConstants.spStudentIdKey, siswa['id']?.toString() ?? '');
