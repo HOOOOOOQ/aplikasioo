@@ -50,7 +50,10 @@ class AkademikErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final app = error is AppError ? error : AppError.from(error);
+    // `error` adalah field widget (tidak dipromosikan analyzer), jadi salin ke
+    // variabel lokal agar tipenya menyempit ke [AppError].
+    final raw = error;
+    final app = raw is AppError ? raw : AppError.from(raw);
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
