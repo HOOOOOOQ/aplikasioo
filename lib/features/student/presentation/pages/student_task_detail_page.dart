@@ -171,7 +171,7 @@ class _StudentTaskDetailPageState extends ConsumerState<StudentTaskDetailPage> {
                               children: [
                                 const Icon(Icons.attach_file, color: AppColors.primary),
                                 const SizedBox(width: 8),
-                                Expanded(child: Text(tugas.lampiranPath!, style: const TextStyle(fontSize: 12))),
+                                Expanded(child: Text(tugas.lampiranPath ?? '-', style: const TextStyle(fontSize: 12))),
                                 TextButton(
                                   onPressed: () async {
                                     try {

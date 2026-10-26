@@ -28,15 +28,19 @@ class _TeacherTaskStatusPageState extends State<TeacherTaskStatusPage> {
 
   Future<void> _load() async {
     if (SupabaseConfig.isNotConfigured) {
+      if (!mounted) return;
       setState(() => _loading = false);
       return;
     }
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final s = await TugasRepository().fetchStatusForTugas(widget.taskId);
       final sum = await TugasRepository().fetchSummary(widget.taskId);
+      if (!mounted) return;
       setState(() { _list = s; _summary = sum; _loading = false; });
     } catch (_) {
+      if (!mounted) return;
       setState(() => _loading = false);
     }
   }
@@ -71,7 +75,7 @@ class _TeacherTaskStatusPageState extends State<TeacherTaskStatusPage> {
                   child: SegmentedButton<String>(
                     segments: const [ButtonSegment(value: 'Semua', label: Text('Semua')), ButtonSegment(value: 'Selesai', label: Text('Selesai')), ButtonSegment(value: 'Belum', label: Text('Belum'))],
                     selected: {_filter},
-                    onSelectionChanged: (s) => setState(() => _filter = s.first),
+                    onSelectionChanged: (s) => setState(() => _filter = s.isEmpty ? _filter : s.first),
                   ),
                 ),
                 const SizedBox(height: 8),

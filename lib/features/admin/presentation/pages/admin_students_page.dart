@@ -71,7 +71,7 @@ class _AdminStudentsPageState extends ConsumerState<AdminStudentsPage> {
                 TextFormField(controller: namaC, decoration: const InputDecoration(labelText: 'Nama Lengkap *'), validator: (v) => Validators.nama(v)),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: kelasId,
+                  value: kelasList.any((k) => k.id == kelasId) ? kelasId : null,
                   decoration: const InputDecoration(labelText: 'Kelas'),
                   items: kelasList.map((k) => DropdownMenuItem(value: k.id, child: Text(k.namaKelas))).toList(),
                   onChanged: (v) => kelasId = v,
@@ -95,7 +95,8 @@ class _AdminStudentsPageState extends ConsumerState<AdminStudentsPage> {
       // generate kode akses if new
       String? kodeAkses;
       if (existing == null) {
-        kodeAkses = 'SISWA-${nisC.text.trim().toUpperCase()}-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
+        final epochStr = DateTime.now().millisecondsSinceEpoch.toString();
+        kodeAkses = 'SISWA-${nisC.text.trim().toUpperCase()}-${epochStr.length >= 8 ? epochStr.substring(8) : epochStr}';
       }
       if (existing == null) {
         await SiswaRepository().create(nomorInduk: nisC.text.trim(), nama: namaC.text.trim(), kelasId: kelasId, kodeAkses: kodeAkses);

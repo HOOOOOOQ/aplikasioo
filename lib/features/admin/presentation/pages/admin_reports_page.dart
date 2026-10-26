@@ -119,8 +119,8 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
                     trailing: FutureBuilder<Map<String, int>>(
                       future: TugasRepository().fetchSummary(t.id),
                       builder: (ctx, snap) {
-                        if (!snap.hasData) return const SizedBox(width: 40, child: LinearProgressIndicator());
-                        final m = snap.data!;
+                        if (!snap.hasData || snap.data == null) return const SizedBox(width: 40, child: LinearProgressIndicator());
+                        final m = snap.data ?? {};
                         final total = m['total'] ?? 1;
                         final selesai = m['selesai'] ?? 0;
                         final pct = total == 0 ? 0 : (selesai / total * 100).round();

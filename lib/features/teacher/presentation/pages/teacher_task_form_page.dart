@@ -45,10 +45,12 @@ class _TeacherTaskFormPageState extends State<TeacherTaskFormPage> {
   }
 
   Future<void> _loadExisting() async {
+    final tid = widget.taskId;
+    if (tid == null || tid.isEmpty) return;
     if (!mounted) return;
     setState(() => _initialLoading = true);
     try {
-      final t = await TugasRepository().fetchById(widget.taskId!);
+      final t = await TugasRepository().fetchById(tid);
       if (!mounted) return;
       if (t != null) {
         _judulC.text = t.judul;
@@ -131,8 +133,8 @@ class _TeacherTaskFormPageState extends State<TeacherTaskFormPage> {
         'guru_id': guruId,
         'kelas_id': _kelasId,
         'mata_pelajaran_id': _mapelId,
-        'tanggal_mulai': _tanggalMulai!.toIso8601String(),
-        'tenggat_waktu': _tenggat!.toIso8601String(),
+        'tanggal_mulai': (_tanggalMulai ?? DateTime.now()).toIso8601String(),
+        'tenggat_waktu': (_tenggat ?? DateTime.now().add(const Duration(days: 7))).toIso8601String(),
         'lampiran_path': lampiranPath,
         'status_publikasi': 'published',
       };
@@ -176,13 +178,15 @@ class _TeacherTaskFormPageState extends State<TeacherTaskFormPage> {
               FutureBuilder<List<Kelas>>(future: SupabaseConfig.isNotConfigured ? Future.value(<Kelas>[]) : KelasRepository().fetchAll(), builder: (ctx, snap) {
                 final list = snap.data ?? <Kelas>[];
                 if (list.isEmpty && SupabaseConfig.isNotConfigured) return const Text('Kelas: mode demo — tidak tersedia', style: TextStyle(fontSize: 12, color: AppColors.textSecondary));
-                return DropdownButtonFormField<String>(value: _kelasId, decoration: const InputDecoration(labelText: 'Kelas Tujuan *', prefixIcon: Icon(Icons.class_outlined)), items: list.map((k) => DropdownMenuItem(value: k.id, child: Text(k.namaKelas))).toList(), onChanged: (v) => setState(() => _kelasId = v), validator: (v) => Validators.requiredField(v, fieldName: 'Kelas'));
+                final validKelasId = list.any((k) => k.id == _kelasId) ? _kelasId : null;
+                return DropdownButtonFormField<String>(value: validKelasId, decoration: const InputDecoration(labelText: 'Kelas Tujuan *', prefixIcon: Icon(Icons.class_outlined)), items: list.map((k) => DropdownMenuItem(value: k.id, child: Text(k.namaKelas))).toList(), onChanged: (v) => setState(() => _kelasId = v), validator: (v) => Validators.requiredField(v, fieldName: 'Kelas'));
               }),
               const SizedBox(height: 12),
               FutureBuilder<List<MataPelajaran>>(future: SupabaseConfig.isNotConfigured ? Future.value(<MataPelajaran>[]) : MapelRepository().fetchAll(), builder: (ctx, snap) {
                 final list = snap.data ?? <MataPelajaran>[];
                 if (list.isEmpty && SupabaseConfig.isNotConfigured) return const Text('Mapel: mode demo — tidak tersedia', style: TextStyle(fontSize: 12, color: AppColors.textSecondary));
-                return DropdownButtonFormField<String>(value: _mapelId, decoration: const InputDecoration(labelText: 'Mata Pelajaran *', prefixIcon: Icon(Icons.menu_book_outlined)), items: list.map((m) => DropdownMenuItem(value: m.id, child: Text(m.namaMapel))).toList(), onChanged: (v) => setState(() => _mapelId = v), validator: (v) => Validators.requiredField(v, fieldName: 'Mata Pelajaran'));
+                final validMapelId = list.any((m) => m.id == _mapelId) ? _mapelId : null;
+                return DropdownButtonFormField<String>(value: validMapelId, decoration: const InputDecoration(labelText: 'Mata Pelajaran *', prefixIcon: Icon(Icons.menu_book_outlined)), items: list.map((m) => DropdownMenuItem(value: m.id, child: Text(m.namaMapel))).toList(), onChanged: (v) => setState(() => _mapelId = v), validator: (v) => Validators.requiredField(v, fieldName: 'Mata Pelajaran'));
               }),
               const SizedBox(height: 12),
               Row(children: [
@@ -221,8 +225,10 @@ class _TeacherTaskFormPageState extends State<TeacherTaskFormPage> {
       onTap: () async {
         final d = await showDatePicker(context: context, initialDate: value ?? DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime(2030));
         if (d == null) return;
+        if (!mounted) return;
         final t = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(value ?? DateTime.now()));
         if (t == null) return;
+        if (!mounted) return;
         onChanged(DateTime(d.year, d.month, d.day, t.hour, t.minute));
       },
       child: InputDecorator(

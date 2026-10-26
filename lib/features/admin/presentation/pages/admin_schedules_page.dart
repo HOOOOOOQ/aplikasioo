@@ -87,7 +87,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
               children: [
                 DropdownButtonFormField<String>(value: kelasId, decoration: const InputDecoration(labelText: 'Kelas *'), items: kelasList.map((k) => DropdownMenuItem(value: k.id, child: Text(k.namaKelas))).toList(), onChanged: (v) => kelasId = v, validator: (v) => Validators.requiredField(v, fieldName: 'Kelas')),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(value: hari, decoration: const InputDecoration(labelText: 'Hari *'), items: AppDateUtils.daftarHari.map((h) => DropdownMenuItem(value: h, child: Text(h))).toList(), onChanged: (v) => hari = v!),
+                DropdownButtonFormField<String>(value: hari, decoration: const InputDecoration(labelText: 'Hari *'), items: AppDateUtils.daftarHari.map((h) => DropdownMenuItem(value: h, child: Text(h))).toList(), onChanged: (v) { if (v != null) hari = v; }),
                 const SizedBox(height: 12),
                 Row(children: [
                   Expanded(child: TextFormField(controller: jamMulaiC, decoration: const InputDecoration(labelText: 'Jam Mulai (HH:mm) *'), validator: (v) => Validators.requiredField(v, fieldName: 'Jam Mulai'))),
@@ -95,9 +95,9 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                   Expanded(child: TextFormField(controller: jamSelesaiC, decoration: const InputDecoration(labelText: 'Jam Selesai (HH:mm) *'), validator: (v) => Validators.requiredField(v, fieldName: 'Jam Selesai'))),
                 ]),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(value: guruId, decoration: const InputDecoration(labelText: 'Guru *'), items: gurus.map((g) => DropdownMenuItem(value: g['id'] as String, child: Text(g['full_name'] as String))).toList(), onChanged: (v) => guruId = v, validator: (v) => Validators.requiredField(v, fieldName: 'Guru')),
+                DropdownButtonFormField<String>(value: guruId, decoration: const InputDecoration(labelText: 'Guru *'), items: gurus.map((g) => DropdownMenuItem(value: g['id']?.toString() ?? '', child: Text(g['full_name']?.toString() ?? '-'))).toList(), onChanged: (v) => guruId = v, validator: (v) => Validators.requiredField(v, fieldName: 'Guru')),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(value: mapelId, decoration: const InputDecoration(labelText: 'Mata Pelajaran *'), items: mapelList.map((m) => DropdownMenuItem(value: m.id, child: Text(m.namaMapel))).toList(), onChanged: (v) => mapelId = v, validator: (v) => Validators.requiredField(v, fieldName: 'Mapel')),
+                DropdownButtonFormField<String>(value: mapelList.any((m) => m.id == mapelId) ? mapelId : null, decoration: const InputDecoration(labelText: 'Mata Pelajaran *'), items: mapelList.map((m) => DropdownMenuItem(value: m.id, child: Text(m.namaMapel))).toList(), onChanged: (v) => mapelId = v, validator: (v) => Validators.requiredField(v, fieldName: 'Mapel')),
                 const SizedBox(height: 12),
                 TextFormField(controller: ruangC, decoration: const InputDecoration(labelText: 'Ruang')),
               ],

@@ -122,7 +122,7 @@ class _AdminTeachersPageState extends ConsumerState<AdminTeachersPage> {
                           child: ListTile(
                             leading: CircleAvatar(backgroundColor: active ? AppColors.successContainer : AppColors.errorContainer, child: Icon(Icons.badge, color: active ? AppColors.success : AppColors.error)),
                             title: Text(g['full_name'] ?? '-', style: const TextStyle(fontWeight: FontWeight.w600)),
-                            subtitle: Text('${g['email']}\nStatus: ${active ? "Aktif" : "Nonaktif"}', style: const TextStyle(fontSize: 12)),
+                            subtitle: Text('${g['email'] ?? '-'} \nStatus: ${active ? "Aktif" : "Nonaktif"}', style: const TextStyle(fontSize: 12)),
                             isThreeLine: true,
                             trailing: PopupMenuButton(
                               itemBuilder: (ctx) => [

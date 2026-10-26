@@ -30,9 +30,9 @@ class AppScaffold extends StatelessWidget {
     return Scaffold(
       backgroundColor: backgroundColor ?? AppColors.background,
       appBar: appBar ??
-          (showAppBar && title != null
+          (showAppBar && title != null && title!.isNotEmpty
               ? AppBar(
-                  title: Text(title!),
+                  title: Text(title!), 
                   actions: actions,
                 )
               : null),
