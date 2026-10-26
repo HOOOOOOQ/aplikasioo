@@ -33,6 +33,7 @@ import '../../features/teacher/presentation/pages/teacher_shell.dart';
 import '../../features/teacher/presentation/pages/teacher_task_form_page.dart';
 import '../../features/teacher/presentation/pages/teacher_task_status_page.dart';
 import '../../features/teacher/presentation/pages/teacher_tasks_page.dart';
+import '../../features/akademik/domain/akademik_models.dart';
 import '../../features/akademik/presentation/chat_room_page.dart';
 import '../../features/akademik/presentation/chat_threads_page.dart';
 import '../../features/akademik/presentation/kalender_page.dart';

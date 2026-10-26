@@ -236,7 +236,9 @@ class _ChatThreadsPageState extends ConsumerState<ChatThreadsPage> {
               ),
               error: (e, _) => AkademikErrorView(
                 error: e,
-                onRetry: () => ref.invalidate(chatThreadsProvider(widget.audience)),
+                onRetry: () async {
+                  ref.invalidate(chatThreadsProvider(widget.audience));
+                },
               ),
               data: (threads) {
                 if (threads.isEmpty) {

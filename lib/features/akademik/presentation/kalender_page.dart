@@ -76,7 +76,9 @@ class _KalenderPageState extends ConsumerState<KalenderPage> {
         ),
         error: (e, _) => AkademikErrorView(
           error: e,
-          onRetry: () => ref.invalidate(kalenderProvider(widget.audience)),
+          onRetry: () async {
+            ref.invalidate(kalenderProvider(widget.audience));
+          },
         ),
         data: (items) {
           final filtered = _filterTipe == null

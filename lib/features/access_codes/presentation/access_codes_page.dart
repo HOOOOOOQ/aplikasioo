@@ -165,7 +165,8 @@ class _AccessCodesPageState extends ConsumerState<AccessCodesPage> {
     final created = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      barrierDismissible: false,
+      isDismissible: false,
+      enableDrag: false,
       builder: (ctx) => _IssueCodeSheet(
         kelasList: kelasList,
         isTeacher: widget.isTeacher,

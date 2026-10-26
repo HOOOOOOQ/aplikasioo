@@ -119,7 +119,9 @@ class _PencarianPageState extends ConsumerState<PencarianPage> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => AkademikErrorView(
                 error: e,
-                onRetry: () => ref.invalidate(pencarianProvider(args)),
+                onRetry: () async {
+                  ref.invalidate(pencarianProvider(args));
+                },
               ),
               data: (hits) {
                 if (hits.isEmpty) {

@@ -100,8 +100,7 @@ class AkademikRepository {
         'deskripsi': deskripsi?.trim(),
         'tipe': tipe,
         'tanggal_mulai': tanggalMulai.toIso8601String().substring(0, 10),
-        'tanggal_selesai':
-            tanggalSelesai == null ? null : tanggalSelesai.toIso8601String().substring(0, 10),
+        'tanggal_selesai': tanggalSelesai?.toIso8601String().substring(0, 10),
         'kelas_id': kelasId,
       });
     } on PostgrestException catch (e) {
@@ -226,13 +225,11 @@ class AkademikRepository {
       var query = c
           .from('chat_messages')
           .select('id, thread_id, sender_profile_id, sender_siswa_id, sender_nama, body, created_at')
-          .eq('thread_id', threadId)
-          .order('created_at', ascending: false)
-          .limit(limit);
+          .eq('thread_id', threadId);
       if (before != null) {
         query = query.lt('created_at', before.toUtc().toIso8601String());
       }
-      final rows = await query;
+      final rows = await query.order('created_at', ascending: false).limit(limit);
       return rows.reversed
           .map((row) => ChatMessage.fromJson(Map<String, dynamic>.from(row)))
           .toList();

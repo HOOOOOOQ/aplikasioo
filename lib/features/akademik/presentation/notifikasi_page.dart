@@ -116,7 +116,9 @@ class _NotifikasiPageState extends ConsumerState<NotifikasiPage> {
         ),
         error: (e, _) => AkademikErrorView(
           error: e,
-          onRetry: () => ref.invalidate(notifikasiProvider(widget.audience)),
+          onRetry: () async {
+            ref.invalidate(notifikasiProvider(widget.audience));
+          },
         ),
         data: (list) {
           if (list.isEmpty) {

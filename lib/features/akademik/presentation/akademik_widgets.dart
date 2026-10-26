@@ -50,7 +50,7 @@ class AkademikErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final app = error is AppError ? error as AppError : AppError.from(error);
+    final app = error is AppError ? error : AppError.from(error);
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
@@ -141,7 +141,7 @@ class AkademikMeta extends StatelessWidget {
 
 /// Menampilkan error sebagai dialog yang bisa ditutup (dipakai halaman form).
 Future<void> showAkademikErrorDialog(BuildContext context, Object error) async {
-  final app = error is AppError ? error as AppError : AppError.from(error);
+  final app = error is AppError ? error : AppError.from(error);
   await showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
