@@ -34,8 +34,10 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     setState(() { _loading = true; _error = null; });
     try {
       final data = await TugasRepository().fetchAll();
+      if (!mounted) return;
       setState(() { _list = data; _loading = false; });
     } catch (e) {
+      if (!mounted) return;
       setState(() { _loading = false; _error = e.toString(); });
     }
   }

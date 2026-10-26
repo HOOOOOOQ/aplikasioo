@@ -35,8 +35,10 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
     setState(() => _loading = true);
     try {
       final data = await TugasRepository().fetchAll(kelasId: _filterKelas);
+      if (!mounted) return;
       setState(() { _tugas = data; _loading = false; });
     } catch (_) {
+      if (!mounted) return;
       setState(() => _loading = false);
     }
   }

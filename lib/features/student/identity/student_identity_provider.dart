@@ -44,7 +44,8 @@ class StudentIdentityNotifier extends StateNotifier<StudentIdentity> {
       // Try to fetch siswa data only if Supabase ready
       if (SupabaseService.isReady) {
         try {
-          final client = SupabaseService.client;
+          final client = SupabaseService.tryClient;
+          if (client == null) throw Exception('Supabase not ready');
           final data = await client.from('siswa').select('*, kelas(nama_kelas)').eq('id', siswaId).maybeSingle();
           if (data != null) {
             final kelasNama = (data['kelas'] is Map) ? (data['kelas'] as Map)['nama_kelas'] as String? : null;
@@ -62,7 +63,8 @@ class StudentIdentityNotifier extends StateNotifier<StudentIdentity> {
   Future<bool> verifyAndSave(String kode) async {
     try {
       if (!SupabaseService.isReady) return false;
-      final client = SupabaseService.client;
+      final client = SupabaseService.tryClient;
+      if (client == null) return false;
       // Try Edge Function first
       try {
         final res = await client.functions.invoke('student-access', body: {'kode_akses': kode});

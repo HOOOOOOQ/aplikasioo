@@ -44,13 +44,17 @@ class AppUser extends Equatable {
   });
 
   factory AppUser.fromJson(Map<String, dynamic> json) {
+    DateTime safeParse(dynamic v) {
+      if (v == null) return DateTime.now();
+      try { return DateTime.parse(v as String); } catch (_) { return DateTime.now(); }
+    }
     return AppUser(
-      id: json['id'] as String,
-      email: json['email'] as String,
+      id: json['id'] as String? ?? '',
+      email: json['email'] as String? ?? '',
       fullName: json['full_name'] as String? ?? 'Tanpa Nama',
       role: UserRoleX.fromString(json['role'] as String?),
       isActive: json['is_active'] as bool? ?? true,
-      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : DateTime.now(),
+      createdAt: safeParse(json['created_at']),
     );
   }
 

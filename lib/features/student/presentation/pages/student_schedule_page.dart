@@ -100,10 +100,13 @@ class _StudentSchedulePageState extends ConsumerState<StudentSchedulePage> {
           const SizedBox(height: 8),
 
           Expanded(
-            child: _kelasId == null
-                ? const Center(child: Text('Pilih kelas terlebih dahulu'))
-                : FutureBuilder<List<Jadwal>>(
-                    future: _fetchJadwal(_kelasId!, hariIni, besok),
+            child: Consumer(
+              builder: (ctx2, ref2, _) {
+                final kelasAsync2 = ref2.watch(kelasListProvider);
+                final effectiveForFetch = kelasAsync2.maybeWhen(data: (list) => list.isEmpty ? _kelasId : (_kelasId ?? list.first.id), orElse: () => _kelasId);
+                if (effectiveForFetch == null) return const Center(child: Text('Pilih kelas terlebih dahulu'));
+                return FutureBuilder<List<Jadwal>>(
+                    future: _fetchJadwal(effectiveForFetch, hariIni, besok),
                     builder: (ctx, snap) {
                       if (snap.connectionState == ConnectionState.waiting) return const LoadingView();
                       if (snap.hasError) return ErrorState(message: snap.error.toString(), onRetry: () => setState(() {}));
@@ -150,7 +153,9 @@ class _StudentSchedulePageState extends ConsumerState<StudentSchedulePage> {
                         ],
                       );
                     },
-                  ),
+                  );
+              },
+            ),
           ),
         ],
       ),

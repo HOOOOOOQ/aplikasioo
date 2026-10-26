@@ -68,7 +68,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/siswa', builder: (ctx, s) => const StudentMainPage()),
       GoRoute(path: '/siswa/jadwal', builder: (ctx, s) => const StudentSchedulePage()),
       GoRoute(path: '/siswa/tugas', builder: (ctx, s) => const StudentTaskListPage()),
-      GoRoute(path: '/siswa/tugas/:id', builder: (ctx, s) => StudentTaskDetailPage(taskId: s.pathParameters['id']!)),
+      GoRoute(path: '/siswa/tugas/:id', builder: (ctx, s) {
+        final id = s.pathParameters['id'];
+        if (id == null || id.isEmpty) return Scaffold(body: Center(child: Text('ID tugas tidak valid'))); 
+        return StudentTaskDetailPage(taskId: id);
+      }),
       GoRoute(path: '/siswa/tentang', builder: (ctx, s) => const StudentAboutPage()),
       GoRoute(path: '/siswa/identitas', builder: (ctx, s) => const StudentIdentityPage()),
 
@@ -97,8 +101,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/guru/tugas', builder: (ctx, s) => const TeacherTasksPage()),
           GoRoute(path: '/guru/tugas/tambah', builder: (ctx, s) => const TeacherTaskFormPage()),
           GoRoute(path: '/guru/tugas/:id/edit', builder: (ctx, s) => TeacherTaskFormPage(taskId: s.pathParameters['id'])),
-          GoRoute(path: '/guru/tugas/:id/status', builder: (ctx, s) => TeacherTaskStatusPage(taskId: s.pathParameters['id']!)),
-          GoRoute(path: '/guru/tugas/:id', builder: (ctx, s) => StudentTaskDetailPage(taskId: s.pathParameters['id']!, isTeacherView: true)),
+          GoRoute(path: '/guru/tugas/:id/status', builder: (ctx, s) {
+            final id = s.pathParameters['id'];
+            if (id == null || id.isEmpty) return Scaffold(body: Center(child: Text('ID tugas tidak valid')));
+            return TeacherTaskStatusPage(taskId: id);
+          }),
+          GoRoute(path: '/guru/tugas/:id', builder: (ctx, s) {
+            final id = s.pathParameters['id'];
+            if (id == null || id.isEmpty) return Scaffold(body: Center(child: Text('ID tugas tidak valid')));
+            return StudentTaskDetailPage(taskId: id, isTeacherView: true);
+          }),
           GoRoute(path: '/guru/profil', builder: (ctx, s) => const TeacherProfilePage()),
         ],
       ),

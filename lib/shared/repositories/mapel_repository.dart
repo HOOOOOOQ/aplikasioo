@@ -17,18 +17,22 @@ class MapelRepository {
   }
 
   Future<MataPelajaran> create({required String nama, String? deskripsi}) async {
-    final c = SupabaseService.client;
+    final c = SupabaseService.tryClient;
+    if (c == null) throw Exception('Supabase belum dikonfigurasi — atur SUPABASE_URL/ANON_KEY');
     final res = await c.from('mata_pelajaran').insert({'nama_mapel': nama, 'deskripsi': deskripsi}).select().single();
     return MataPelajaran.fromJson(res);
   }
 
   Future<MataPelajaran> update(String id, Map<String, dynamic> patch) async {
-    final c = SupabaseService.client;
+    final c = SupabaseService.tryClient;
+    if (c == null) throw Exception('Supabase belum dikonfigurasi — atur SUPABASE_URL/ANON_KEY');
     final res = await c.from('mata_pelajaran').update(patch).eq('id', id).select().single();
     return MataPelajaran.fromJson(res);
   }
 
   Future<void> delete(String id) async {
-    await SupabaseService.client.from('mata_pelajaran').delete().eq('id', id);
+    final _guard = SupabaseService.tryClient;
+    if (_guard == null) throw Exception('Supabase belum dikonfigurasi');
+    await _guard.from('mata_pelajaran').delete().eq('id', id);
   }
 }

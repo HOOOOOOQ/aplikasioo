@@ -22,17 +22,21 @@ class StatusTugasSiswa extends Equatable {
   });
 
   factory StatusTugasSiswa.fromJson(Map<String, dynamic> json) {
+    DateTime safeParse(dynamic v, {DateTime? fallback}) {
+      if (v == null) return fallback ?? DateTime.now();
+      try { return DateTime.parse(v as String); } catch (_) { return fallback ?? DateTime.now(); }
+    }
     String? siswaNama;
     if (json['siswa'] != null && json['siswa'] is Map) siswaNama = (json['siswa'] as Map)['nama'] as String?;
     String? tugasJudul;
     if (json['tugas'] != null && json['tugas'] is Map) tugasJudul = (json['tugas'] as Map)['judul'] as String?;
     return StatusTugasSiswa(
-      id: json['id'] as String,
-      tugasId: json['tugas_id'] as String,
-      siswaId: json['siswa_id'] as String,
-      status: json['status'] as String,
-      selesaiPada: json['selesai_pada'] != null ? DateTime.parse(json['selesai_pada'] as String) : null,
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      id: json['id'] as String? ?? '',
+      tugasId: json['tugas_id'] as String? ?? '',
+      siswaId: json['siswa_id'] as String? ?? '',
+      status: json['status'] as String? ?? 'belum_selesai',
+      selesaiPada: json['selesai_pada'] != null ? safeParse(json['selesai_pada'], fallback: null) : null,
+      updatedAt: safeParse(json['updated_at']),
       siswaNama: siswaNama,
       tugasJudul: tugasJudul,
     );
