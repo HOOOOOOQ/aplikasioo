@@ -94,7 +94,7 @@ serve(async (req: Request) => {
     if (!token) {
       return json(401, {
         error: "Token akses siswa wajib. Verifikasi ulang kode siswa di aplikasi.",
-        code: "missing_token",
+        code: "student_token_missing",
       });
     }
 
@@ -102,7 +102,7 @@ serve(async (req: Request) => {
     if (parts.length !== 3) {
       return json(401, {
         error: "Token tidak valid. Verifikasi ulang kode siswa di aplikasi.",
-        code: "invalid_token",
+        code: "student_token_invalid",
       });
     }
     const [tokenSiswaId, expRaw, signature] = parts;
@@ -110,13 +110,13 @@ serve(async (req: Request) => {
     if (!Number.isFinite(exp) || exp * 1000 < Date.now()) {
       return json(401, {
         error: "Token kedaluwarsa. Verifikasi ulang kode siswa di aplikasi.",
-        code: "token_expired",
+        code: "student_token_expired",
       });
     }
 
     const expected = await hmac(`${tokenSiswaId}.${expRaw}`, tokenSecret);
     if (!safeEqual(expected, signature)) {
-      return json(401, { error: "Token tidak valid.", code: "invalid_token" });
+      return json(401, { error: "Token tidak valid.", code: "student_token_invalid" });
     }
     if (tokenSiswaId !== siswaId) {
       return json(403, {

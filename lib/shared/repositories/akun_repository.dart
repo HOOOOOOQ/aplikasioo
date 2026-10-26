@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/services/session_guard.dart';
+import '../../core/utils/app_error.dart';
 import '../services/supabase_service.dart';
 
 final akunRepositoryProvider = Provider<AkunRepository>((ref) => AkunRepository());
@@ -183,10 +185,20 @@ class AkunRepository {
     }).toList();
   }
 
-  Future<Map<String, int>> fetchDashboardCounts() async {
+  /// Hitung ringkasan dashboard.
+  ///
+  /// Setiap angka dihitung terpisah: satu tabel/fungsi yang belum siap (mis.
+  /// `kode_akses_siswa` belum ada karena migration 004/005 belum dijalankan)
+  /// tidak boleh menggagalkan seluruh dashboard. Kegagalan dikumpulkan di
+  /// [DashboardCounts.issues] agar UI bisa menampilkan peringatan yang jujur
+  /// alih-alih angka nol yang menyesatkan.
+  Future<DashboardCounts> fetchDashboardCounts() async {
     final c = _c;
     if (c == null) {
-      return {'guru': 0, 'kelas': 0, 'mapel': 0, 'jadwal': 0, 'tugas': 0, 'kode_aktif': 0};
+      return const DashboardCounts(
+        values: {'guru': 0, 'kelas': 0, 'mapel': 0, 'jadwal': 0, 'tugas': 0, 'kode_aktif': 0},
+        issues: {},
+      );
     }
 
     Future<int> count(String table, {Map<String, dynamic>? eq}) async {
@@ -200,22 +212,56 @@ class AkunRepository {
       return rows.length;
     }
 
-    final results = await Future.wait([
-      count('profiles', eq: {'role': 'guru', 'is_active': true}),
-      count('kelas'),
-      count('mata_pelajaran'),
-      count('jadwal_pelajaran'),
-      count('tugas', eq: {'status_publikasi': 'published'}),
-      count('kode_akses_siswa', eq: {'status': 'active'}),
+    final values = <String, int>{};
+    final issues = <String, AppError>{};
+
+    Future<void> safe(String key, Future<int> Function() run) async {
+      try {
+        values[key] = await run();
+      } catch (e) {
+        final error = AppError.from(e);
+        // Masalah sesi/jaringan bukan soal data: hentikan agar UI meminta
+        // login ulang atau mencoba lagi, bukan menampilkan 0.
+        if (SessionGuard.isSessionErrorCode(error.code) ||
+            error.code == 'network' ||
+            error.code == 'timeout') {
+          rethrow;
+        }
+        issues[key] = error;
+      }
+    }
+
+    await Future.wait([
+      safe('guru', () => count('profiles', eq: {'role': 'guru', 'is_active': true})),
+      safe('kelas', () => count('kelas')),
+      safe('mapel', () => count('mata_pelajaran')),
+      safe('jadwal', () => count('jadwal_pelajaran')),
+      safe('tugas', () => count('tugas', eq: {'status_publikasi': 'published'})),
+      safe('kode_aktif', () => count('kode_akses_siswa', eq: {'status': 'active'})),
     ]);
 
-    return {
-      'guru': results[0],
-      'kelas': results[1],
-      'mapel': results[2],
-      'jadwal': results[3],
-      'tugas': results[4],
-      'kode_aktif': results[5],
-    };
+    return DashboardCounts(values: values, issues: issues);
   }
+}
+
+/// Hasil [AkunRepository.fetchDashboardCounts].
+class DashboardCounts {
+  /// Nilai per metrik. Kunci yang gagal dihitung tidak ada di sini.
+  final Map<String, int> values;
+
+  /// Metrik yang gagal dimuat beserta penyebabnya.
+  final Map<String, AppError> issues;
+
+  const DashboardCounts({required this.values, required this.issues});
+
+  int operator [](String key) => values[key] ?? 0;
+
+  /// True bila ada metrik yang tidak bisa dihitung.
+  bool get hasIssues => issues.isNotEmpty;
+
+  /// True bila penyebabnya skema database yang belum lengkap.
+  bool get schemaNotReady => issues.values.any((e) => e.code == 'schema_not_ready');
+
+  /// True bila metrik tertentu berhasil dimuat.
+  bool has(String key) => values.containsKey(key);
 }

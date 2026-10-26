@@ -144,7 +144,18 @@ class AppErrorState extends StatelessWidget {
   final String? message;
   final VoidCallback? onRetry;
 
-  const AppErrorState({super.key, this.error, this.message, this.onRetry});
+  /// Aksi sekunder opsional (mis. "Buka Pengaturan" untuk skema yang belum siap).
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  const AppErrorState({
+    super.key,
+    this.error,
+    this.message,
+    this.onRetry,
+    this.actionLabel,
+    this.onAction,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -192,6 +203,14 @@ class AppErrorState extends StatelessWidget {
               onPressed: onRetry,
               icon: const Icon(Icons.refresh_rounded, size: 18),
               label: const Text('Coba lagi'),
+            ),
+          ],
+          if (actionLabel != null && onAction != null) ...[
+            SizedBox(height: onRetry == null ? AppSpacing.lg : AppSpacing.xs),
+            TextButton.icon(
+              onPressed: onAction,
+              icon: const Icon(Icons.settings_rounded, size: 18),
+              label: Text(actionLabel!),
             ),
           ],
         ],

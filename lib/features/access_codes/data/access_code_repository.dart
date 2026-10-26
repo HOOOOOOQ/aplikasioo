@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/services/session_guard.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../shared/services/supabase_service.dart';
 import '../domain/access_code.dart';
@@ -20,12 +21,20 @@ class AccessCodeRepository {
     final c = _c;
     if (c == null) return const [];
 
+    // Hanya kolom yang benar-benar dipakai UI. `kode_hash` TIDAK pernah
+    // diminta ke server, apalagi ditampilkan.
     var query = c.from('kode_akses_siswa').select(
       'id, kode_prefix, kelas_id, siswa_id, single_use, status, expires_at, used_at, used_by_siswa_id, revoked_at, created_by, created_at, note',
     );
     if (kelasId != null && kelasId.isNotEmpty) query = query.eq('kelas_id', kelasId);
 
-    final rows = await query.order('created_at', ascending: false).limit(limit);
+    final List<dynamic> rows;
+    try {
+      rows = await query.order('created_at', ascending: false).limit(limit);
+    } on PostgrestException catch (e) {
+      // Termasuk PGRST205 "Could not find the table ... in the schema cache".
+      throw AppError.from(e);
+    }
     if (rows.isEmpty) return const [];
 
     final kelasIds = <String>{};
@@ -104,6 +113,10 @@ class AccessCodeRepository {
   }
 
   /// Terbitkan kode baru. Pembuatan kode dilakukan server (CSPRNG).
+  ///
+  /// Sebelum memanggil Edge Function, sesi dipastikan masih berlaku dan
+  /// access token dikirim eksplisit (lihat [SessionGuard]). Bila server tetap
+  /// menolak dengan 401, sesi di-refresh sekali lalu permintaan diulang.
   Future<IssuedAccessCode> issue({
     required String kelasId,
     String? siswaId,
@@ -111,57 +124,119 @@ class AccessCodeRepository {
     int? expiresInDays,
     String? note,
   }) async {
-    final c = SupabaseService.tryClient;
-    if (c == null) {
+    final payload = <String, dynamic>{
+      'kelas_id': kelasId,
+      'siswa_id': siswaId,
+      'single_use': singleUse,
+      'expires_in_days': expiresInDays,
+      'note': note,
+    };
+
+    final data = await _invoke('issue', payload, allowRetry: true);
+    final code = data['kode'] as String?;
+    final row = data['data'] is Map
+        ? Map<String, dynamic>.from(data['data'] as Map)
+        : <String, dynamic>{};
+    if (code == null || code.isEmpty) {
+      throw const AppError(
+        title: 'Kode tidak terbentuk',
+        message: 'Server tidak mengembalikan kode akses.',
+        hint: 'Coba lagi. Bila tetap gagal, periksa log Edge Function student-codes.',
+        code: 'bad_response',
+      );
+    }
+    return IssuedAccessCode(
+      code: code,
+      id: row['id'] as String? ?? '',
+      expiresAt: row['expires_at'] == null ? null : DateTime.tryParse(row['expires_at'].toString()),
+    );
+  }
+
+  Future<void> revoke(String id) async {
+    await _invoke('revoke', {'id': id}, allowRetry: true);
+  }
+
+  /// Panggil Edge Function `student-codes` dengan sesi yang sudah divalidasi.
+  Future<Map<String, dynamic>> _invoke(
+    String action,
+    Map<String, dynamic> payload, {
+    required bool allowRetry,
+  }) async {
+    final client = SupabaseService.tryClient;
+    if (client == null) {
       throw const AppError(
         title: 'Belum terhubung',
         message: 'Supabase belum dikonfigurasi pada build ini.',
+        hint: 'Hubungi pengelola aplikasi.',
         code: 'config',
       );
     }
 
+    final session = await SessionGuard.ensureValidSession();
+    if (!session.isReady) {
+      throw session.error ??
+          const AppError(
+            title: 'Sesi login berakhir',
+            message: 'Sesi login tidak dapat dipakai.',
+            hint: 'Masuk kembali sebagai admin atau guru.',
+            code: 'session_expired',
+          );
+    }
+
     try {
-      final res = await c.functions.invoke('student-codes', body: {
-        'action': 'issue',
-        'kelas_id': kelasId,
-        'siswa_id': siswaId,
-        'single_use': singleUse,
-        'expires_in_days': expiresInDays,
-        'note': note,
-      });
+      final res = await client.functions.invoke(
+        'student-codes',
+        body: {'action': action, ...payload},
+        // Token dikirim eksplisit: jangan bergantung pada perilaku default SDK.
+        headers: {'Authorization': 'Bearer ${session.accessToken}'},
+      );
+
+      // Beberapa versi SDK mengembalikan respons error tanpa melempar
+      // exception; tetap perlakukan status >= 400 sebagai kegagalan agar
+      // aplikasi tidak pernah menampilkan "berhasil" palsu.
+      if (res.status >= 400) {
+        throw FunctionException(status: res.status, details: res.data);
+      }
 
       final data = res.data;
       if (data is! Map) {
         throw const AppError(
           title: 'Respons tidak dikenali',
-          message: 'Server tidak mengembalikan data kode.',
+          message: 'Server tidak mengembalikan data yang diharapkan.',
           code: 'bad_response',
         );
       }
-      final map = Map<String, dynamic>.from(data);
-      final code = map['kode'] as String?;
-      final row = map['data'] is Map ? Map<String, dynamic>.from(map['data'] as Map) : <String, dynamic>{};
-      if (code == null || code.isEmpty) {
-        throw const AppError(
-          title: 'Kode tidak terbentuk',
-          message: 'Server tidak mengembalikan kode akses.',
-          code: 'bad_response',
-        );
-      }
-      return IssuedAccessCode(
-        code: code,
-        id: row['id'] as String? ?? '',
-        expiresAt: row['expires_at'] == null ? null : DateTime.tryParse(row['expires_at'].toString()),
-      );
+      return Map<String, dynamic>.from(data);
     } on FunctionException catch (e) {
-      throw AppError.from(e);
+      final mapped = AppError.from(e);
+
+      // 401 pada percobaan pertama bisa berarti token baru saja kedaluwarsa di
+      // sisi server (gateway verify_jwt atau function). Refresh sekali lewat
+      // mekanisme resmi GoTrue, lalu ulangi satu kali.
+      if (allowRetry && e.status == 401) {
+        final refreshed = await SessionGuard.ensureValidSession(forceRefresh: true);
+        if (refreshed.isReady) {
+          return _invoke(action, payload, allowRetry: false);
+        }
+        throw refreshed.error ?? mapped;
+      }
+
+      throw mapped;
+    } on AppError {
+      rethrow;
     } catch (e) {
       throw AppError.from(e);
     }
   }
 
-  Future<void> revoke(String id) async {
-    final c = SupabaseService.tryClient;
+  /// Statistik kode langsung dari database (RPC `kode_akses_stats`).
+  ///
+  /// RLS tetap berlaku: admin melihat semua kode, guru hanya kelas yang diampu.
+  /// Bila RPC belum ada (migration 005 belum dijalankan), error diteruskan
+  /// sebagai [AppError] `schema_not_ready` — halaman akan menghitung cadangan
+  /// dari daftar yang berhasil dimuat dan menandainya.
+  Future<AccessCodeStats> fetchStats() async {
+    final c = _c;
     if (c == null) {
       throw const AppError(
         title: 'Belum terhubung',
@@ -170,10 +245,16 @@ class AccessCodeRepository {
       );
     }
     try {
-      await c.functions.invoke('student-codes', body: {'action': 'revoke', 'id': id});
-    } on FunctionException catch (e) {
-      throw AppError.from(e);
-    } catch (e) {
+      final data = await c.rpc('kode_akses_stats');
+      if (data is Map) {
+        return AccessCodeStats.fromJson(Map<String, dynamic>.from(data));
+      }
+      throw const AppError(
+        title: 'Statistik tidak tersedia',
+        message: 'Server tidak mengembalikan data statistik kode.',
+        code: 'bad_response',
+      );
+    } on PostgrestException catch (e) {
       throw AppError.from(e);
     }
   }

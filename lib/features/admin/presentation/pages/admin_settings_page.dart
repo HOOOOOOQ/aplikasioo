@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/config/app_constants.dart';
 import '../../../../core/config/app_info.dart';
 import '../../../../core/config/supabase_config.dart';
+import '../widgets/schema_health_dialog.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/onboarding_service.dart';
 import '../../../../core/widgets/app_card.dart';
@@ -216,6 +217,20 @@ class AdminSettingsPage extends ConsumerWidget {
                 'Anon key bersifat publik dan dilindungi RLS. Service role key tidak pernah '
                 'disertakan di aplikasi.',
                 style: TextStyle(fontSize: 11.5, height: 1.5, color: AppColors.textTertiary),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              OutlinedButton.icon(
+                onPressed: SupabaseConfig.isConfigured
+                    ? () => showSchemaHealthDialog(context)
+                    : null,
+                icon: const Icon(Icons.health_and_safety_outlined, size: 17),
+                label: const Text('Periksa skema database'),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Memeriksa tabel, kolom, fungsi, dan RLS lewat edutask_schema_health(). '
+                'Gunakan setelah menjalankan migration di Supabase.',
+                style: TextStyle(fontSize: 11, height: 1.45, color: AppColors.textTertiary),
               ),
             ],
           ),

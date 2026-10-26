@@ -24,6 +24,56 @@ const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+/**
+ * Ambil token mentah dari "Authorization: Bearer <jwt>".
+ *
+ * Token harus dikirim eksplisit ke GoTrue saat verifikasi. Versi lama function
+ * ini membuat client dengan `global.headers.Authorization` lalu memanggil
+ * `auth.getUser()` TANPA argumen. Pada @supabase/supabase-js 2.39.0,
+ * `getUser()` tidak membaca header global tersebut: karena `persistSession`
+ * dimatikan, client tidak punya session di storage dan langsung mengembalikan
+ * `AuthSessionMissingError`. Akibatnya SEMUA permintaan admin yang sah ditolak
+ * dengan 401 "Sesi tidak valid. Login ulang." — bukan karena sesi kedaluwarsa.
+ *
+ * Perbaikan: token diverifikasi dengan `getUser(token)` (pola yang sama dengan
+ * create-teacher), sehingga signature, masa berlaku, dan status sesi benar-benar
+ * divalidasi oleh GoTrue.
+ */
+function extractBearerToken(headerValue: string | null): string {
+  if (!headerValue) return "";
+  const value = headerValue.trim();
+  const match = /^Bearer\s+(.+)$/i.exec(value);
+  return (match ? match[1] : value).trim();
+}
+
+/**
+ * Deteksi error PostgREST/PostgreSQL yang berarti objek database belum ada
+ * (migration belum dijalankan) atau schema cache masih basi.
+ *
+ * PGRST205 = tabel tidak ada di schema cache, PGRST202 = fungsi tidak ada,
+ * 42P01 = undefined_table, 42883 = undefined_function.
+ */
+function isSchemaMissing(error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false;
+  const code = String(error.code ?? "");
+  if (["PGRST205", "PGRST202", "42P01", "42883"].includes(code)) return true;
+  const msg = String(error.message ?? "").toLowerCase();
+  return msg.includes("could not find the table") ||
+    msg.includes("could not find the function") ||
+    msg.includes("schema cache") ||
+    (msg.includes("relation") && msg.includes("does not exist"));
+}
+
+/** Jawaban standar bila migration kode akses belum diterapkan. */
+function schemaNotReadyResponse(): Response {
+  return json(503, {
+    error:
+      "Skema kode akses belum tersedia di database. Jalankan migration " +
+      "supabase/migrations/005_access_codes_schema_repair.sql di project Supabase Anda.",
+    code: "schema_not_ready",
+  });
+}
+
 // Tanpa karakter ambigu (0/O, 1/I/L) agar mudah dibaca & diketik siswa.
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 10;
@@ -87,13 +137,18 @@ serve(async (req: Request) => {
     return json(500, { error: "Server misconfigured.", code: "server_misconfigured" });
   }
 
-  const authHeader = req.headers.get("Authorization") ?? "";
-  if (!authHeader.toLowerCase().startsWith("bearer ")) {
-    return json(401, { error: "Perlu login admin/guru.", code: "unauthorized" });
+  const bearerToken = extractBearerToken(req.headers.get("Authorization"));
+  if (!bearerToken) {
+    return json(401, {
+      error: "Permintaan tidak menyertakan token login. Masuk kembali sebagai admin/guru.",
+      code: "missing_token",
+    });
   }
 
-  const userClient = createClient(supabaseUrl, anonKey, {
-    global: { headers: { Authorization: authHeader } },
+  // anonKey tetap dipakai sebagai apikey pada client verifikasi agar konsisten
+  // dengan konfigurasi project. Token pengguna TIDAK ditaruh di header global:
+  // token dikirim eksplisit ke getUser(token) di bawah.
+  const verifier = createClient(supabaseUrl, anonKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
   const admin = createClient(supabaseUrl, serviceRoleKey, {
@@ -101,10 +156,31 @@ serve(async (req: Request) => {
   });
 
   try {
-    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    const { data: userData, error: userErr } = await verifier.auth.getUser(bearerToken);
     const user = userData?.user;
     if (userErr || !user) {
-      return json(401, { error: "Sesi tidak valid. Login ulang.", code: "unauthorized" });
+      // Hanya metadata aman yang dicatat — tanpa token, tanpa email.
+      const message = (userErr?.message ?? "user null").toLowerCase();
+      console.warn("student-codes: verifikasi token gagal:", userErr?.status ?? "-");
+
+      if (message.includes("api key") || message.includes("apikey")) {
+        // Kesalahan konfigurasi server (SUPABASE_URL vs SERVICE_ROLE_KEY beda project).
+        return json(500, {
+          error: "Konfigurasi server tidak cocok dengan project Supabase.",
+          code: "server_misconfigured",
+        });
+      }
+
+      const expired = message.includes("expired") ||
+        message.includes("token has expired") ||
+        message.includes("jwt expired");
+
+      return json(401, {
+        error: expired
+          ? "Sesi login sudah kedaluwarsa. Masuk kembali."
+          : "Sesi login tidak valid. Masuk kembali.",
+        code: expired ? "session_expired" : "invalid_token",
+      });
     }
 
     const { data: profile, error: profileErr } = await admin
@@ -115,6 +191,12 @@ serve(async (req: Request) => {
 
     if (profileErr) {
       console.error("student-codes: gagal membaca profil", profileErr.code);
+      if (isSchemaMissing(profileErr)) {
+        return json(503, {
+          error: "Tabel profiles belum tersedia di database.",
+          code: "schema_not_ready",
+        });
+      }
       return json(500, { error: "Gagal memverifikasi akun.", code: "lookup_failed" });
     }
     if (!profile || profile.is_active !== true) {
@@ -168,7 +250,7 @@ serve(async (req: Request) => {
 
     const writeAudit = async (actionName: string, entityId: string, detail: JsonMap) => {
       try {
-        await admin.from("audit_log").insert({
+        const { error } = await admin.from("audit_log").insert({
           actor_id: user.id,
           actor_role: role,
           action: actionName,
@@ -176,8 +258,12 @@ serve(async (req: Request) => {
           entity_id: entityId,
           detail,
         });
+        if (error) {
+          // audit tidak menggagalkan operasi utama, tetapi tetap dicatat di log server.
+          console.warn("student-codes: audit gagal", error.code);
+        }
       } catch (_) {
-        // audit tidak boleh menggagalkan operasi utama
+        // jangan pernah menggagalkan operasi utama karena audit
       }
     };
 
@@ -208,11 +294,16 @@ serve(async (req: Request) => {
         expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
       }
 
-      const { data: kelas } = await admin
+      const { data: kelas, error: kelasErr } = await admin
         .from("kelas")
         .select("id, nama_kelas")
         .eq("id", kelasId)
         .maybeSingle();
+      if (kelasErr) {
+        console.error("student-codes: gagal membaca kelas", kelasErr.code);
+        if (isSchemaMissing(kelasErr)) return schemaNotReadyResponse();
+        return json(500, { error: "Gagal membaca data kelas.", code: "lookup_failed" });
+      }
       if (!kelas) {
         return json(404, { error: "Kelas tidak ditemukan.", code: "kelas_not_found" });
       }
@@ -269,6 +360,7 @@ serve(async (req: Request) => {
         }
         if (error && error.code !== "23505") {
           console.error("student-codes: insert gagal", error.code);
+          if (isSchemaMissing(error)) return schemaNotReadyResponse();
           return json(500, { error: "Gagal membuat kode.", code: "insert_failed" });
         }
       }
@@ -304,7 +396,12 @@ serve(async (req: Request) => {
         .eq("id", id)
         .maybeSingle();
 
-      if (rowErr || !row) {
+      if (rowErr) {
+        console.error("student-codes: revoke lookup gagal", rowErr.code);
+        if (isSchemaMissing(rowErr)) return schemaNotReadyResponse();
+        return json(500, { error: "Gagal membaca kode.", code: "lookup_failed" });
+      }
+      if (!row) {
         return json(404, { error: "Kode tidak ditemukan.", code: "not_found" });
       }
       if (!(await canHandleKelas(String(row.kelas_id)))) {
@@ -321,6 +418,7 @@ serve(async (req: Request) => {
 
       if (updateErr) {
         console.error("student-codes: revoke gagal", updateErr.code);
+        if (isSchemaMissing(updateErr)) return schemaNotReadyResponse();
         return json(500, { error: "Gagal mencabut kode.", code: "update_failed" });
       }
 

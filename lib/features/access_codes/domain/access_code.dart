@@ -157,3 +157,70 @@ class IssuedAccessCode {
 
   const IssuedAccessCode({required this.code, required this.id, this.expiresAt});
 }
+
+/// Statistik kode akses.
+///
+/// Sumber utama: RPC `kode_akses_stats()` (dihitung di database, mengikuti RLS).
+/// Sumber cadangan: [AccessCodeStats.fromList] saat RPC belum tersedia
+/// (migration belum dijalankan) — UI wajib menandai bahwa angkanya perkiraan.
+class AccessCodeStats {
+  final int total;
+  final int active;
+  final int used;
+  final int expired;
+  final int revoked;
+
+  /// True bila angka dihitung dari daftar yang dimuat di klien, bukan dari DB.
+  final bool approximate;
+
+  const AccessCodeStats({
+    required this.total,
+    required this.active,
+    required this.used,
+    required this.expired,
+    required this.revoked,
+    this.approximate = false,
+  });
+
+  static const AccessCodeStats empty = AccessCodeStats(
+    total: 0,
+    active: 0,
+    used: 0,
+    expired: 0,
+    revoked: 0,
+  );
+
+  factory AccessCodeStats.fromJson(Map<String, dynamic> json) {
+    int read(String key) {
+      final value = json[key];
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      return int.tryParse('$value') ?? 0;
+    }
+
+    return AccessCodeStats(
+      total: read('total'),
+      active: read('active'),
+      used: read('used'),
+      expired: read('expired'),
+      revoked: read('revoked'),
+    );
+  }
+
+  /// Hitung dari daftar yang sudah dimuat (cadangan).
+  factory AccessCodeStats.fromList(List<AccessCode> codes) {
+    final counts = <AccessCodeStatus, int>{};
+    for (final code in codes) {
+      final status = code.status;
+      counts[status] = (counts[status] ?? 0) + 1;
+    }
+    return AccessCodeStats(
+      total: codes.length,
+      active: counts[AccessCodeStatus.active] ?? 0,
+      used: counts[AccessCodeStatus.used] ?? 0,
+      expired: counts[AccessCodeStatus.expired] ?? 0,
+      revoked: counts[AccessCodeStatus.revoked] ?? 0,
+      approximate: true,
+    );
+  }
+}
