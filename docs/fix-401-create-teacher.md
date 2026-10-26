@@ -69,6 +69,10 @@ Akar masalah:
   - Validasi email/nama/password, cek duplikasi (409), rollback user bila insert profil gagal,
     respons konsisten `{error, code}` tanpa membocorkan credential.
   - 401 hanya untuk token tidak valid/kedaluwarsa; 403 untuk bukan admin aktif.
+  - **Baru:** bila `auth.getUser()` gagal karena `SUPABASE_SERVICE_ROLE_KEY` tidak cocok
+    dengan `SUPABASE_URL` (mis. secret project lain), respons menjadi **500
+    `server_misconfigured`**, bukan 401 — supaya kesalahan konfigurasi server tidak
+    disalahartikan sebagai sesi admin bermasalah.
 - `supabase/config.toml` — `create-teacher` `verify_jwt = true`; endpoint siswa `false`.
 - `scripts/test-create-teacher.mjs` — uji E2E 401/403/200 tanpa membocorkan token.
 - `README.md` — langkah deploy, diagnosis 401, dan troubleshooting diperbarui.
