@@ -150,8 +150,9 @@ class _AccessCodesPageState extends ConsumerState<AccessCodesPage> {
           FilledButton.icon(
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: issued.code));
-              if (!dialogContext.mounted || !context.mounted) return;
+              if (!dialogContext.mounted) return;
               Navigator.pop(dialogContext);
+              if (!context.mounted) return;
               showAppSnackBar(context, 'Kode disalin ke clipboard.');
             },
             icon: const Icon(Icons.copy_rounded, size: 17),
