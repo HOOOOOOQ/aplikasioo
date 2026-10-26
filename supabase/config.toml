@@ -1,0 +1,18 @@
+# Konfigurasi Supabase CLI untuk proyek EduTask.
+# Dipakai oleh `supabase link` / `supabase functions deploy`.
+# Jangan menaruh secret apa pun di file ini (file ini di-commit ke repo publik).
+
+project_id = "edutask"
+
+# create-teacher WAJIB diverifikasi JWT oleh gateway (pertahanan berlapis).
+# Di dalam function, token tetap diverifikasi ulang ke GoTrue + role admin dicek dari DB.
+[functions.create-teacher]
+verify_jwt = true
+
+# Endpoint siswa dipanggil tanpa login (anon + kode akses), jadi gateway tidak
+# boleh menuntut JWT. Otorisasi tetap dilakukan di dalam function.
+[functions.student-access]
+verify_jwt = false
+
+[functions.update-student-task-status]
+verify_jwt = false
