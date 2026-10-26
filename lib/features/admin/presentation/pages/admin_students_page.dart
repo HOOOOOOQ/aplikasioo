@@ -175,17 +175,47 @@ class _AdminStudentsPageState extends ConsumerState<AdminStudentsPage> {
     }
   }
 
-  Future<void> _delete(Siswa siswa) async {
+  /// Menonaktifkan siswa adalah jalur aman (soft delete): riwayat status tugas
+  /// tetap utuh, sedangkan siswa hilang dari daftar identitas.
+  Future<void> _setActive(Siswa siswa, bool aktif) async {
     final confirmed = await showConfirmDialog(
       context,
-      title: 'Hapus ${siswa.nama}?',
-      content: 'Status tugas siswa ini juga akan terhapus dan tidak bisa dikembalikan.',
+      title: aktif ? 'Aktifkan ${siswa.nama}?' : 'Nonaktifkan ${siswa.nama}?',
+      content: aktif
+          ? 'Siswa akan muncul kembali pada pilihan identitas.'
+          : 'Siswa tidak lagi muncul pada pilihan identitas. Riwayat tugas tetap tersimpan '
+              'dan dapat diaktifkan kembali kapan saja.',
+      confirmLabel: aktif ? 'Aktifkan' : 'Nonaktifkan',
+      isDestructive: !aktif,
+    );
+    if (!confirmed) return;
+    try {
+      await SiswaRepository().update(siswa.id, {'status_aktif': aktif});
+      if (!mounted) return;
+      showAppSnackBar(context, aktif ? 'Siswa diaktifkan.' : 'Siswa dinonaktifkan.');
+      await _refresh();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(context, AppError.from(e).shortMessage, isError: true);
+    }
+  }
+
+  /// Hapus permanen hanya dipakai untuk data yang salah input. Status tugas ikut
+  /// terhapus karena foreign key, jadi aksi ini butuh konfirmasi tegas.
+  Future<void> _deletePermanently(Siswa siswa) async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Hapus permanen ${siswa.nama}?',
+      content: 'Seluruh riwayat status tugas siswa ini ikut terhapus dan tidak dapat '
+          'dikembalikan. Untuk siswa yang sudah lulus/pindah, gunakan Nonaktifkan.',
+      confirmLabel: 'Hapus permanen',
+      isDestructive: true,
     );
     if (!confirmed) return;
     try {
       await SiswaRepository().delete(siswa.id);
       if (!mounted) return;
-      showAppSnackBar(context, 'Siswa dihapus.');
+      showAppSnackBar(context, 'Siswa dihapus permanen.');
       await _refresh();
     } catch (e) {
       if (!mounted) return;
@@ -334,13 +364,18 @@ class _AdminStudentsPageState extends ConsumerState<AdminStudentsPage> {
                               PopupMenuButton<String>(
                                 onSelected: (value) {
                                   if (value == 'edit') _showForm(existing: siswa);
-                                  if (value == 'delete') _delete(siswa);
+                                  if (value == 'toggle') _setActive(siswa, !siswa.statusAktif);
+                                  if (value == 'delete') _deletePermanently(siswa);
                                 },
-                                itemBuilder: (context) => const [
-                                  PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(value: 'edit', child: Text('Edit')),
                                   PopupMenuItem(
+                                    value: 'toggle',
+                                    child: Text(siswa.statusAktif ? 'Nonaktifkan' : 'Aktifkan kembali'),
+                                  ),
+                                  const PopupMenuItem(
                                     value: 'delete',
-                                    child: Text('Hapus', style: TextStyle(color: AppColors.error)),
+                                    child: Text('Hapus permanen', style: TextStyle(color: AppColors.error)),
                                   ),
                                 ],
                               ),

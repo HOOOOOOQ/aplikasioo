@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/about/presentation/about_page.dart';
-import '../../features/access_codes/presentation/access_codes_page.dart';
 import '../../features/admin/presentation/pages/admin_accounts_page.dart';
 import '../../features/admin/presentation/pages/admin_audit_page.dart';
 import '../../features/admin/presentation/pages/admin_classes_page.dart';
@@ -14,11 +13,11 @@ import '../../features/admin/presentation/pages/admin_settings_page.dart';
 import '../../features/admin/presentation/pages/admin_shell.dart';
 import '../../features/admin/presentation/pages/admin_students_page.dart';
 import '../../features/admin/presentation/pages/admin_subjects_page.dart';
-import '../../features/admin/presentation/pages/admin_task_detail_page.dart';
 import '../../features/admin/presentation/pages/admin_tasks_page.dart';
 import '../../features/admin/presentation/pages/admin_teachers_page.dart';
 import '../../features/auth/domain/app_user.dart';
 import '../../features/auth/presentation/auth_provider.dart';
+import '../../features/access_codes/presentation/access_codes_page.dart';
 import '../../features/auth/presentation/login_page.dart';
 import '../../features/onboarding/presentation/onboarding_page.dart';
 import '../../features/student/identity/student_identity_page.dart';
@@ -33,7 +32,7 @@ import '../../features/teacher/presentation/pages/teacher_shell.dart';
 import '../../features/teacher/presentation/pages/teacher_task_form_page.dart';
 import '../../features/teacher/presentation/pages/teacher_task_status_page.dart';
 import '../../features/teacher/presentation/pages/teacher_tasks_page.dart';
-import '../constants/app_colors.dart';
+import '../widgets/error_page.dart';
 import '../widgets/splash_page.dart';
 
 /// Memberi tahu GoRouter saat status autentikasi berubah tanpa membuat ulang
@@ -42,10 +41,18 @@ class _RouterRefresh extends ChangeNotifier {
   void ping() => notifyListeners();
 }
 
+String _homeFor(AppUser? user) {
+  if (user == null || !user.isActive) return '/login';
+  return user.role == UserRole.admin ? '/admin' : '/guru';
+}
+
 final appRouterProvider = Provider<GoRouter>((ref) {
   final refresh = _RouterRefresh();
   ref.onDispose(refresh.dispose);
-  ref.listen<AsyncValue<AppUser?>>(currentUserProvider, (previous, next) => refresh.ping());
+  ref.listen<AsyncValue<AppUser?>>(
+    currentUserProvider,
+    (previous, next) => refresh.ping(),
+  );
 
   final router = GoRouter(
     initialLocation: '/splash',
@@ -57,34 +64,30 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       // Rute publik.
       if (path == '/splash' || path == '/onboarding') return null;
-      if (path == '/login' || path == '/tentang' || path == '/') return null;
+      if (path == '/login' || path == '/tentang') return null;
       if (path.startsWith('/siswa')) return null;
 
       // Jangan pernah menampilkan dashboard sebelum profil & role terverifikasi.
-      if (auth.isLoading && user == null) {
-        final protected = path.startsWith('/admin') || path.startsWith('/guru');
-        if (protected) return '/splash';
-      }
+      final isProtected = path.startsWith('/admin') || path.startsWith('/guru');
+      if (!isProtected) return null;
 
-      if (!(path.startsWith('/admin') || path.startsWith('/guru'))) return null;
-
+      if (auth.isLoading && user == null) return '/splash';
       if (user == null) return '/login';
       if (!user.isActive) return '/login';
 
       if (path.startsWith('/admin') && user.role != UserRole.admin) {
         return user.role == UserRole.guru ? '/guru' : '/login';
       }
-      if (path.startsWith('/guru') && user.role != UserRole.guru && user.role != UserRole.admin) {
+      if (path.startsWith('/guru') &&
+          user.role != UserRole.guru &&
+          user.role != UserRole.admin) {
         return '/login';
       }
       return null;
     },
     routes: [
       GoRoute(path: '/splash', builder: (ctx, s) => const SplashPage()),
-      GoRoute(
-        path: '/',
-        redirect: (c, s) => '/splash',
-      ),
+      GoRoute(path: '/', redirect: (c, s) => '/splash'),
       GoRoute(path: '/onboarding', builder: (ctx, s) => const OnboardingPage()),
       GoRoute(path: '/login', builder: (ctx, s) => const LoginPage()),
       GoRoute(
@@ -109,7 +112,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (ctx, s) {
           final id = s.pathParameters['id'];
           if (id == null || id.isEmpty) {
-            return const _InvalidRoutePage(message: 'ID tugas tidak valid.');
+            return const AppRouteErrorPage(
+              title: 'Tugas tidak ditemukan',
+              message: 'Tautan yang Anda buka tidak memuat ID tugas.',
+              fallbackRoute: '/siswa/tugas',
+            );
           }
           return StudentTaskDetailPage(taskId: id);
         },
@@ -130,39 +137,32 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/admin/tugas', builder: (ctx, s) => const AdminTasksPage()),
           GoRoute(
             path: '/admin/tugas/:id/status',
-            builder: (ctx, s) {
-              final id = s.pathParameters['id'];
-              if (id == null || id.isEmpty) {
-                return const _InvalidRoutePage(message: 'ID tugas tidak valid.');
-              }
-              return TeacherTaskStatusPage(taskId: id);
-            },
+            builder: (ctx, s) => TeacherTaskStatusPage(taskId: s.pathParameters['id'] ?? ''),
           ),
           GoRoute(
             path: '/admin/tugas/:id/edit',
-            builder: (ctx, s) {
-              final id = s.pathParameters['id'];
-              if (id == null || id.isEmpty) {
-                return const _InvalidRoutePage(message: 'ID tugas tidak valid.');
-              }
-              return TeacherTaskFormPage(taskId: id, adminMode: true);
-            },
+            builder: (ctx, s) => TeacherTaskFormPage(
+              taskId: s.pathParameters['id'],
+              adminMode: true,
+            ),
           ),
           GoRoute(
             path: '/admin/tugas/:id',
-            builder: (ctx, s) {
-              final id = s.pathParameters['id'];
-              if (id == null || id.isEmpty) {
-                return const _InvalidRoutePage(message: 'ID tugas tidak valid.');
-              }
-              return AdminTaskDetailPage(taskId: id);
-            },
+            builder: (ctx, s) => StudentTaskDetailPage(
+              taskId: s.pathParameters['id'] ?? '',
+              isTeacherView: true,
+              adminMode: true,
+            ),
           ),
           GoRoute(path: '/admin/laporan', builder: (ctx, s) => const AdminReportsPage()),
-          GoRoute(path: '/admin/kode-akses', builder: (ctx, s) => const AccessCodesPage(isTeacher: false)),
+          GoRoute(path: '/admin/kode-akses', builder: (ctx, s) => const AccessCodesPage()),
           GoRoute(path: '/admin/akun', builder: (ctx, s) => const AdminAccountsPage()),
           GoRoute(path: '/admin/audit', builder: (ctx, s) => const AdminAuditPage()),
           GoRoute(path: '/admin/pengaturan', builder: (ctx, s) => const AdminSettingsPage()),
+          GoRoute(
+            path: '/admin/tentang',
+            builder: (ctx, s) => const AboutPage(fallbackRoute: '/admin'),
+          ),
         ],
       ),
 
@@ -176,129 +176,35 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/guru/tugas/tambah', builder: (ctx, s) => const TeacherTaskFormPage()),
           GoRoute(
             path: '/guru/tugas/:id/edit',
-            builder: (ctx, s) {
-              final id = s.pathParameters['id'];
-              if (id == null || id.isEmpty) {
-                return const _InvalidRoutePage(message: 'ID tugas tidak valid.');
-              }
-              return TeacherTaskFormPage(taskId: id);
-            },
+            builder: (ctx, s) => TeacherTaskFormPage(taskId: s.pathParameters['id']),
           ),
           GoRoute(
             path: '/guru/tugas/:id/status',
-            builder: (ctx, s) {
-              final id = s.pathParameters['id'];
-              if (id == null || id.isEmpty) {
-                return const _InvalidRoutePage(message: 'ID tugas tidak valid.');
-              }
-              return TeacherTaskStatusPage(taskId: id);
-            },
+            builder: (ctx, s) => TeacherTaskStatusPage(taskId: s.pathParameters['id'] ?? ''),
           ),
           GoRoute(
             path: '/guru/tugas/:id',
-            builder: (ctx, s) {
-              final id = s.pathParameters['id'];
-              if (id == null || id.isEmpty) {
-                return const _InvalidRoutePage(message: 'ID tugas tidak valid.');
-              }
-              return StudentTaskDetailPage(taskId: id, isTeacherView: true);
-            },
+            builder: (ctx, s) => StudentTaskDetailPage(
+              taskId: s.pathParameters['id'] ?? '',
+              isTeacherView: true,
+            ),
           ),
           GoRoute(path: '/guru/kode-akses', builder: (ctx, s) => const AccessCodesPage(isTeacher: true)),
           GoRoute(path: '/guru/profil', builder: (ctx, s) => const TeacherProfilePage()),
+          GoRoute(
+            path: '/guru/tentang',
+            builder: (ctx, s) => const AboutPage(fallbackRoute: '/guru'),
+          ),
         ],
       ),
     ],
-    errorBuilder: (ctx, state) => AppRouteErrorPage(location: state.uri.toString()),
+    errorBuilder: (ctx, state) => AppRouteErrorPage(
+      title: 'Halaman tidak ditemukan',
+      message: 'Rute "${state.uri}" tidak tersedia. Periksa kembali tautan yang dibuka.',
+      fallbackRoute: _homeFor(ref.read(currentUserProvider).valueOrNull),
+      location: state.uri.toString(),
+    ),
   );
 
   return router;
 });
-
-class _InvalidRoutePage extends StatelessWidget {
-  final String message;
-  const _InvalidRoutePage({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Halaman tidak valid')),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.xxl),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.link_off_rounded, size: 44, color: AppColors.textTertiary),
-              const SizedBox(height: AppSpacing.md),
-              Text(message, textAlign: TextAlign.center),
-              const SizedBox(height: AppSpacing.lg),
-              FilledButton(
-                onPressed: () => context.go('/siswa'),
-                child: const Text('Ke beranda siswa'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Halaman error rute (menggantikan tampilan debug bawaan GoRouter).
-class AppRouteErrorPage extends StatelessWidget {
-  final String location;
-  const AppRouteErrorPage({super.key, required this.location});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Halaman tidak ditemukan')),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.xxl),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 76,
-                height: 76,
-                decoration: const BoxDecoration(
-                  color: AppColors.primaryContainer,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.explore_off_rounded, size: 36, color: AppColors.primary),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              const Text(
-                'Halaman tidak tersedia',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                location,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: AppColors.textTertiary),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  OutlinedButton(
-                    onPressed: () => context.go('/login'),
-                    child: const Text('Ke login'),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  FilledButton(
-                    onPressed: () => context.go('/siswa'),
-                    child: const Text('Beranda siswa'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

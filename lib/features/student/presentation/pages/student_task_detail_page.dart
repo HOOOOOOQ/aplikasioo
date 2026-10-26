@@ -25,7 +25,17 @@ final taskDetailProvider = FutureProvider.autoDispose.family<Tugas?, String>((re
 class StudentTaskDetailPage extends ConsumerStatefulWidget {
   final String taskId;
   final bool isTeacherView;
-  const StudentTaskDetailPage({super.key, required this.taskId, this.isTeacherView = false});
+
+  /// Admin membuka tugas guru (moderasi). Tombol ubah/status tetap memakai
+  /// otorisasi server, bukan flag ini.
+  final bool adminMode;
+
+  const StudentTaskDetailPage({
+    super.key,
+    required this.taskId,
+    this.isTeacherView = false,
+    this.adminMode = false,
+  });
 
   @override
   ConsumerState<StudentTaskDetailPage> createState() => _StudentTaskDetailPageState();
