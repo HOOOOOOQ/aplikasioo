@@ -1,7 +1,7 @@
 # EduTask — Ronde 3: Perbaikan Skema Supabase, Sesi Auth, Database & Bug Terkait
 
-Versi aplikasi: **1.2.0** (versionCode mengikuti nomor run CI, build #70)
-Branch: `arena/e59ba061-aplikasioo` → PR **#59**
+Versi aplikasi: **1.2.0** (versionCode mengikuti nomor run CI, build #72)
+Branch: `arena/e59ba061-aplikasioo` → PR **#59** (merged `4ece187`)
 Tanggal: 2026-10-26
 
 > **Batas kejujuran laporan ini.** Lingkungan kerja tidak memiliki akses ke project
@@ -225,28 +225,36 @@ tidak ada perubahan pada `001`–`004` (yang mungkin sudah dijalankan di project
 |---|---|
 | `flutter analyze --no-fatal-infos --no-fatal-warnings` | ✅ lolos (run `40353745740`) |
 | `flutter test` | ✅ **121 tes** lolos (85 tes lama + 36 tes baru/berubah) |
-| `flutter build apk --release` (+ split-per-abi) | ✅ build #70 (`40353745762`) |
+| `flutter build apk --release` (+ split-per-abi) | ✅ build #70 (`40353745762`, PR) dan #72 (`40355371520`, main) |
 | Validasi APK (`aapt`, `apksigner`) | ✅ `com.edutask.sekolah`, versionName `1.2.0`, `sdkVersion 24`, `targetSdkVersion 36`, v2 + v3 |
 | Uji instalasi emulator | ⚠️ job "success" tetapi **emulator gagal boot** dan log smoke test tidak dihasilkan — **bukan** bukti runtime |
 | Sintaks SQL 001–005 | ✅ `pgsql-parser` |
 | Typecheck Edge Functions | ✅ `tsc` strict + shim Deno/supabase-js |
 | Sintaks Dart (92 file) | ✅ tree-sitter-dart, 0 error |
 
-### APK (build #70, PR artifact)
+### APK rilis (build #72, release `latest-apk`)
 
-| File | Ukuran | SHA-256 |
+| File | Byte | SHA-256 (aset rilis) |
 |---|---|---|
-| `EduTask-1.2.0-arm64-v8a.apk` | 26 MB | `e5448b08f337f9028dae208f14f2c4f0a431171e4004e00a383e3e27b5970bc4` |
-| `EduTask-1.2.0-armeabi-v7a.apk` | 23 MB | `f002d3a6145cd88437dac910d4cc7beba7c2fced961ea39492d84c65b992f515` |
-| `EduTask-1.2.0-universal.apk` | 63 MB | `84a93cfa43a5418e5140ef29f1b80951f7726687968993e526455521b38d4d2a` |
-| `EduTask-1.2.0-x86_64.apk` | 27 MB | `f98285d300ab6a37334c5668d921d36e93d0750e1e2041fbcf23890ff6dcd1b8` |
+| `EduTask-1.2.0-arm64-v8a.apk` | 26.262.179 | `eb83053592ad9c8d1aee7da7c56f2b3b80fdaf15bc3f092c7f398a985bd65ccb` |
+| `EduTask-1.2.0-armeabi-v7a.apk` | 24.066.729 | `171566beef3acc6371ea1cf290acc889fb9c8ed70a120ca04008e71aae1102ec` |
+| `EduTask-1.2.0-universal.apk` | 65.084.528 | `5c9af920e6c4a1088b79c7266dcc0481126841299716cbfdd3fa2496a00bfd6e` |
+| `EduTask-1.2.0-x86_64.apk` | 27.433.626 | `dd3f93d44e104b700556f3869be931bc74431290c524fb2e6c97d9889f99afbd` |
 
-- versionCode: 2070 (arm64), 1070 (armeabi-v7a), 70 (universal), 4070 (x86_64)
+`SHA256SUMS.txt` (aset rilis): 375 byte,
+SHA-256 `ae591dc6faab1efa988ec015f5d60c8d8500f148654564dd26c057348b296f8e`.
+
+- versionCode: 2072 (arm64), 1072 (armeabi-v7a), 72 (universal), 4072 (x86_64)
 - Signer: `C=ID, O=EduTask Sekolah, CN=EduTask`, RSA 2048, **v2 + v3**
 - Sertifikat SHA-256: `f3d985e457b01512b34091c25826869ed48fe9efd42b988375fc401562ffcbf9`
   (sama dengan rilis 1.1.0 ⇒ update APK tidak memaksa uninstall)
 - ABI: `arm64-v8a`, `armeabi-v7a`, `x86_64`, universal
-- Aplikasi rilis `latest-apk` baru diperbarui setelah PR di-merge ke `main`.
+- Release `latest-apk` sudah diperbarui (aset 1.2.0 ×4 + `SHA256SUMS.txt`) setelah
+  PR #59 di-merge ke `main` (build #72).
+- SHA-256 build PR #70 (tidak dipublikasikan sebagai rilis): arm64
+  `e5448b08f337f9028dae208f14f2c4f0…`, armeabi-v7a `f002d3a6145cd88437dac910d…`,
+  universal `84a93cfa43a5418e5140ef29f1b80951…`, x86_64 `f98285d300ab6a37334c5668…`
+  — berbeda dari build #72 karena `versionCode` berbeda.
 
 ---
 
@@ -313,4 +321,5 @@ tidak ada perubahan pada `001`–`004` (yang mungkin sudah dijalankan di project
    alur identitas siswa akan rusak.
 4. **Uji instalasi nyata & emulator** tidak berhasil (emulator gagal boot). APK
    divalidasi struktural (aapt/apksigner), bukan dijalankan di perangkat.
-5. **Waktu build #70** belum dipublikasikan ke release `latest-apk` (menunggu merge).
+5. **Catatan rilis**: sesudah merge, main build #72 berhasil dan release
+   `latest-apk` berisi APK 1.2.0. APK tetap belum diuji instalasi nyata di perangkat.
