@@ -227,6 +227,7 @@ Keduanya idempotent dan sudah diverifikasi **sintaksnya** dengan parser PostgreS
 | `apksigner verify --print-certs` | build #67 | lulus: v2 **true**, v3 **true**, 1 signer `CN=EduTask`, cert SHA-256 `f3d985e4…cbf9` |
 | `zipalign -c -v 4` | build #67 | lulus |
 | Uji instalasi emulator Android 14 (x86_64) | build #67, job `install-test` | **gagal boot emulator** (infrastruktur runner; langkah `continue-on-error`). Tidak ada bukti runtime dari CI. |
+| **Run `main` setelah merge** (`40330928036` Verify, `40330927731` Build) | commit `85769b6` | verify **sukses** (analyze 0 temuan, 85 test), build **#69** sukses dan menerbitkan rilis `latest-apk` |
 
 Catatan: `flutter analyze` dijalankan dengan `--no-fatal-infos --no-fatal-warnings`, tetapi
 semua temuan tetap dicetak ke komentar PR. Run terakhir di atas **tidak menemukan satu pun
