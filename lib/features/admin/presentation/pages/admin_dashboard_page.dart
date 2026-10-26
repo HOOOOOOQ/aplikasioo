@@ -15,6 +15,7 @@ import '../../../../shared/models/tugas.dart';
 import '../../../../shared/repositories/akun_repository.dart';
 import '../../../../shared/repositories/siswa_repository.dart';
 import '../../../../shared/repositories/tugas_repository.dart';
+import '../../../akademik/data/akademik_providers.dart';
 import '../../../auth/presentation/auth_provider.dart';
 import '../widgets/schema_health_dialog.dart';
 
@@ -206,6 +207,8 @@ class AdminDashboardPage extends ConsumerWidget {
             ),
           ],
         ),
+        const SizedBox(height: AppSpacing.xl),
+        const _AkademikStatsCard(),
         const SizedBox(height: AppSpacing.xl),
         const SectionHeader(title: 'Aksi cepat', icon: Icons.bolt_rounded),
         Wrap(
@@ -463,6 +466,108 @@ class _SessionExpiredView extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+
+/// Ringkasan akademik dari RPC `akademik_stats()` (migration 006).
+///
+/// Bila function belum ada di server, kartu menampilkan pesan yang jelas tanpa
+/// mengganggu bagian dashboard lain.
+class _AkademikStatsCard extends ConsumerWidget {
+  const _AkademikStatsCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(akademikStatsProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeader(
+          title: 'Statistik akademik',
+          icon: Icons.insights_rounded,
+          actionLabel: async.isLoading ? null : 'Muat ulang',
+          onAction: async.isLoading ? null : () => ref.invalidate(akademikStatsProvider),
+        ),
+        AppCard(
+          child: async.when(
+            loading: () => const AppLoading(message: 'Menghitung statistik…', compact: true),
+            error: (e, _) {
+              final app = e is AppError ? e : AppError.from(e);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    app.title,
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.warning),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    app.message,
+                    style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    'Statistik muncul setelah migration 006 dijalankan di Supabase.',
+                    style: TextStyle(fontSize: 10.5, color: AppColors.textTertiary),
+                  ),
+                ],
+              );
+            },
+            data: (stats) => Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: MetricTile(
+                        label: 'Pengumpulan',
+                        value: '${stats.pengumpulan}',
+                        icon: Icons.upload_file_rounded,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: MetricTile(
+                        label: 'Menunggu nilai',
+                        value: '${stats.menungguNilai}',
+                        icon: Icons.pending_actions_rounded,
+                        color: AppColors.warning,
+                        background: AppColors.warningContainer,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: [
+                    Expanded(
+                      child: MetricTile(
+                        label: 'Rata-rata nilai',
+                        value: stats.rataNilai.toStringAsFixed(1),
+                        icon: Icons.grade_rounded,
+                        color: AppColors.success,
+                        background: AppColors.successContainer,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: MetricTile(
+                        label: 'Pengumuman',
+                        value: '${stats.pengumumanTerbit}',
+                        icon: Icons.campaign_rounded,
+                        color: AppColors.info,
+                        background: AppColors.infoContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

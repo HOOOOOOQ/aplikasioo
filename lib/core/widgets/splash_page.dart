@@ -7,8 +7,12 @@ import 'package:go_router/go_router.dart';
 import '../config/app_info.dart';
 import '../config/supabase_config.dart';
 import '../constants/app_colors.dart';
+import '../services/app_preferences.dart';
+import '../services/app_version.dart';
 import '../services/onboarding_service.dart';
+import '../services/welcome_sound.dart';
 import '../utils/app_error.dart';
+import '../widgets/app_banner.dart';
 import '../../features/auth/domain/app_user.dart';
 import '../../features/auth/presentation/auth_provider.dart';
 
@@ -42,13 +46,23 @@ class _SplashPageState extends ConsumerState<SplashPage>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..forward();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _playWelcomeSound();
+      _bootstrap();
+    });
   }
 
   @override
   void dispose() {
     _anim.dispose();
     super.dispose();
+  }
+
+  /// Suara pembuka: sekali per peluncuran, mengikuti preferensi pengguna.
+  Future<void> _playWelcomeSound() async {
+    final prefs = await AppPreferences.read();
+    if (!mounted) return;
+    await WelcomeSoundService.playOnce(enabled: prefs.welcomeSound);
   }
 
   Future<void> _bootstrap() async {
@@ -122,6 +136,8 @@ class _SplashPageState extends ConsumerState<SplashPage>
 
   @override
   Widget build(BuildContext context) {
+    // Hormati pengaturan "hapus animasi" sistem: jangan mainkan transisi.
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
     final progress = switch (_step) {
       0 => 0.06,
       1 => 0.28,
@@ -141,34 +157,18 @@ class _SplashPageState extends ConsumerState<SplashPage>
               child: Column(
                 children: [
                   const Spacer(flex: 3),
-                  FadeTransition(
-                    opacity: CurvedAnimation(parent: _anim, curve: Curves.easeOut),
-                    child: ScaleTransition(
-                      scale: Tween<double>(begin: 0.86, end: 1).animate(
-                        CurvedAnimation(parent: _anim, curve: Curves.easeOutBack),
-                      ),
-                      child: Container(
-                        width: 104,
-                        height: 104,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x33000000),
-                              blurRadius: 28,
-                              offset: Offset(0, 12),
-                            ),
-                          ],
+                  if (reduceMotion)
+                    const EduTaskLogo(size: 104, withShadow: true)
+                  else
+                    FadeTransition(
+                      opacity: CurvedAnimation(parent: _anim, curve: Curves.easeOut),
+                      child: ScaleTransition(
+                        scale: Tween<double>(begin: 0.86, end: 1).animate(
+                          CurvedAnimation(parent: _anim, curve: Curves.easeOutBack),
                         ),
-                        child: const Icon(
-                          Icons.school_rounded,
-                          size: 56,
-                          color: AppColors.primary,
-                        ),
+                        child: const EduTaskLogo(size: 104, withShadow: true),
                       ),
                     ),
-                  ),
                   const SizedBox(height: AppSpacing.lg),
                   const Text(
                     AppInfo.appName,
@@ -233,13 +233,23 @@ class _SplashPageState extends ConsumerState<SplashPage>
                       ],
                     ),
                   const Spacer(flex: 2),
-                  Text(
-                    'v${AppInfo.version} • ${AppInfo.copyright}',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.white.withValues(alpha: 0.6),
-                    ),
+                  Column(
+                    children: [
+                      AppVersionLabel(
+                        color: Colors.white.withValues(alpha: 0.75),
+                        fontSize: 10.5,
+                        suffix: AppInfo.copyright,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        AppInfo.teamMotto,
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          letterSpacing: 0.4,
+                          color: Colors.white.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

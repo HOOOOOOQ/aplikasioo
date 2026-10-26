@@ -24,42 +24,47 @@ const List<_OnboardingStep> _steps = [
   _OnboardingStep(
     title: 'Kenali EduTask',
     description:
-        'Aplikasi untuk membantu mengelola tugas, jadwal sekolah, dan informasi pembelajaran dalam satu tempat.',
+        'EduTask membantu mengelola tugas, jadwal sekolah, pengumuman, dan komunikasi '
+        'pembelajaran dalam satu aplikasi.',
     icon: Icons.school_rounded,
     color: AppColors.primary,
     highlights: ['Jadwal & tugas terpusat', 'Untuk admin, guru, dan siswa'],
   ),
   _OnboardingStep(
-    title: 'Jadwal Lebih Teratur',
+    title: 'Masuk sebagai Guru atau Admin',
     description:
-        'Lihat jadwal pelajaran dan informasi kelas yang tersedia untuk akunmu.',
-    icon: Icons.calendar_month_rounded,
+        'Guru dan admin masuk dengan akun yang diberikan pengelola sekolah. Menu dan '
+        'data yang tampil selalu mengikuti peran akun tersebut.',
+    icon: Icons.login_rounded,
     color: AppColors.info,
-    highlights: ['Jadwal per hari', 'Info kelas & mata pelajaran'],
+    highlights: ['Guru mengelola tugas & jadwal kelasnya', 'Admin mengelola data sekolah'],
   ),
   _OnboardingStep(
-    title: 'Kelola Tugas dengan Mudah',
+    title: 'Siswa: Tugas & Jadwal',
     description:
-        'Guru dapat membuat tugas dan menambahkan lampiran. Siswa dapat melihat instruksi serta tenggat waktu sesuai aksesnya.',
+        'Siswa dapat melihat jadwal pelajaran dan daftar tugas tanpa login. '
+        'Tenggat waktu dan instruksi tampil langsung di beranda.',
     icon: Icons.assignment_turned_in_rounded,
     color: AppColors.success,
-    highlights: ['Lampiran tugas', 'Pengingat sebelum tenggat'],
+    highlights: ['Filter tugas & tenggat', 'Jadwal mingguan per kelas'],
   ),
   _OnboardingStep(
-    title: 'Hubungkan Identitasmu',
+    title: 'Hubungkan Identitas via Kode Akses',
     description:
-        'Masukkan kode akses yang diberikan sekolah atau guru jika diperlukan untuk menghubungkan identitas siswa dan mengirim status tugas resmi.',
+        'Kode akses diberikan guru atau admin. Setelah dihubungkan, siswa dapat mengirim '
+        'jawaban tugas, melihat nilai, dan mengikuti diskusi kelas.',
     icon: Icons.verified_user_rounded,
     color: AppColors.warning,
-    highlights: ['Kode dibuat admin/guru', 'Status resmi tercatat ke guru'],
+    highlights: ['Kode sekali pakai dari guru', 'Tidak perlu password siswa'],
   ),
   _OnboardingStep(
-    title: 'Semua Lebih Terorganisir',
+    title: 'Notifikasi, Chat, dan Pengumpulan',
     description:
-        'Masuk dengan akunmu untuk mengakses fitur yang sesuai dengan peranmu.',
-    icon: Icons.rocket_launch_rounded,
+        'Pantau pengumuman, kirim pesan ke guru atau grup kelas, dan kumpulkan tugas '
+        'tepat waktu. Semua pemberitahuan tersimpan di pusat notifikasi.',
+    icon: Icons.forum_rounded,
     color: AppColors.primary,
-    highlights: ['Admin mengelola sekolah', 'Guru mengelola tugas kelasnya'],
+    highlights: ['Chat privat & grup kelas', 'Nilai dan umpan balik guru'],
   ),
 ];
 

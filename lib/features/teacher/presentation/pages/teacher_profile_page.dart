@@ -8,6 +8,8 @@ import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/app_states.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
+import '../../../../core/widgets/app_preferences_section.dart';
+import '../../../../core/services/app_version.dart';
 import '../../../auth/presentation/auth_provider.dart';
 import '../../../auth/domain/app_user.dart';
 
@@ -33,11 +35,17 @@ class TeacherProfilePage extends ConsumerWidget {
             children: [
               InfoRow(label: 'Peran', value: user?.role.label ?? '-', icon: Icons.badge_outlined),
               InfoRow(label: 'Status akun', value: (user?.isActive ?? false) ? 'Aktif' : 'Nonaktif', icon: Icons.verified_user_outlined),
-              InfoRow(label: 'Versi aplikasi', value: AppInfo.version, icon: Icons.info_outline_rounded),
+              InfoRow(
+                label: 'Versi aplikasi',
+                value: AppInfo.version,
+                icon: Icons.info_outline_rounded,
+              ),
             ],
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
+        AppPreferencesSection(aboutRoute: '/guru/tentang'),
+        const SizedBox(height: AppSpacing.xl),
         const SectionHeader(title: 'Bantuan', icon: Icons.help_outline_rounded),
         AppCard(
           padding: EdgeInsets.zero,
@@ -85,9 +93,15 @@ class TeacherProfilePage extends ConsumerWidget {
         ),
         const SizedBox(height: AppSpacing.xl),
         Center(
-          child: Text(
-            '${AppInfo.appName} v${AppInfo.version} • ${AppInfo.copyright}',
-            style: const TextStyle(fontSize: 10.5, color: AppColors.textTertiary),
+          child: Column(
+            children: [
+              AppVersionLabel(fontSize: 10.5, suffix: AppInfo.appName),
+              const SizedBox(height: 2),
+              Text(
+                AppInfo.copyright,
+                style: const TextStyle(fontSize: 10.5, color: AppColors.textTertiary),
+              ),
+            ],
           ),
         ),
       ],

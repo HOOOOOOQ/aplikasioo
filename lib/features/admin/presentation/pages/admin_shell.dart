@@ -27,6 +27,10 @@ const List<AdminNavItem> adminNavItems = [
   AdminNavItem('Tugas', '/admin/tugas', Icons.assignment_outlined, Icons.assignment_rounded),
   AdminNavItem('Kode Akses', '/admin/kode-akses', Icons.key_outlined, Icons.key_rounded),
   AdminNavItem('Laporan', '/admin/laporan', Icons.insights_outlined, Icons.insights_rounded),
+  AdminNavItem('Pengumuman', '/admin/pengumuman', Icons.campaign_outlined, Icons.campaign_rounded),
+  AdminNavItem('Kalender', '/admin/kalender', Icons.event_outlined, Icons.event_rounded),
+  AdminNavItem('Chat', '/admin/chat', Icons.forum_outlined, Icons.forum_rounded),
+  AdminNavItem('Notifikasi', '/admin/notifikasi', Icons.notifications_outlined, Icons.notifications_rounded),
   AdminNavItem('Akun & Role', '/admin/akun', Icons.manage_accounts_outlined, Icons.manage_accounts_rounded),
   AdminNavItem('Audit Log', '/admin/audit', Icons.history_rounded, Icons.history_rounded),
   AdminNavItem('Pengaturan', '/admin/pengaturan', Icons.settings_outlined, Icons.settings_rounded),
@@ -72,6 +76,11 @@ class AdminShell extends ConsumerWidget {
       appBar: AppBar(
         title: Text(current.label),
         actions: [
+          IconButton(
+            tooltip: 'Pencarian global',
+            onPressed: () => context.go('/admin/pencarian'),
+            icon: const Icon(Icons.search_rounded),
+          ),
           IconButton(
             tooltip: 'Tentang aplikasi',
             onPressed: () => context.push('/tentang?from=admin'),

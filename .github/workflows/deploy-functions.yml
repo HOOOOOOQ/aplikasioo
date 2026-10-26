@@ -20,6 +20,8 @@ on:
           - student-access
           - student-codes
           - update-student-task-status
+          - student-portal
+          - student-chat
           - all
 
 permissions:

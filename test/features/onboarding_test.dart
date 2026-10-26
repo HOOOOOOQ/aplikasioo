@@ -55,7 +55,7 @@ void main() {
       await tester.tap(find.text('Lanjut'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Jadwal Lebih Teratur'), findsOneWidget);
+      expect(find.text('Masuk sebagai Guru atau Admin'), findsOneWidget);
       expect(find.text('Kembali'), findsOneWidget);
 
       await tester.tap(find.text('Kembali'));
@@ -75,7 +75,7 @@ void main() {
         await tester.pumpAndSettle();
       }
 
-      expect(find.text('Semua Lebih Terorganisir'), findsOneWidget);
+      expect(find.text('Notifikasi, Chat, dan Pengumpulan'), findsOneWidget);
       expect(find.text('Mulai Sekarang'), findsOneWidget);
       expect(find.text('Lanjut'), findsNothing);
     });

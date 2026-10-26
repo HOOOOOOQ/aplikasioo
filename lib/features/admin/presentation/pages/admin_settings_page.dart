@@ -12,6 +12,8 @@ import '../../../../core/services/onboarding_service.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
+import '../../../../core/services/app_version.dart';
+import '../../../../core/widgets/app_preferences_section.dart';
 import '../../../auth/presentation/auth_provider.dart';
 import '../../../notifications/notification_service.dart';
 import '../../../student/identity/student_identity_provider.dart';
@@ -88,6 +90,8 @@ class AdminSettingsPage extends ConsumerWidget {
             ],
           ),
         ),
+        const SizedBox(height: AppSpacing.xl),
+        AppPreferencesSection(aboutRoute: '/admin/tentang'),
         const SizedBox(height: AppSpacing.xl),
         const SectionHeader(title: 'Bantuan & panduan', icon: Icons.menu_book_rounded),
         AppCard(
@@ -239,10 +243,7 @@ class AdminSettingsPage extends ConsumerWidget {
         Center(
           child: Column(
             children: [
-              const Text(
-                '${AppInfo.appName} v${AppInfo.version}',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
-              ),
+              AppVersionLabel(fontSize: 12, suffix: AppInfo.appName),
               const SizedBox(height: 2),
               const Text(AppInfo.copyright, style: TextStyle(fontSize: 10.5, color: AppColors.textTertiary)),
               const SizedBox(height: 2),
