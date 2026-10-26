@@ -149,11 +149,15 @@ class _AccessCodesPageState extends ConsumerState<AccessCodesPage> {
           ),
           FilledButton.icon(
             onPressed: () async {
+              // Messenger diambil sebelum await agar tidak memakai BuildContext
+              // setelah jeda async (lint use_build_context_synchronously).
+              final messenger = ScaffoldMessenger.of(context);
               await Clipboard.setData(ClipboardData(text: issued.code));
               if (!dialogContext.mounted) return;
               Navigator.pop(dialogContext);
-              if (!context.mounted) return;
-              showAppSnackBar(context, 'Kode disalin ke clipboard.');
+              messenger.showSnackBar(
+                const SnackBar(content: Text('Kode disalin ke clipboard.')),
+              );
             },
             icon: const Icon(Icons.copy_rounded, size: 17),
             label: const Text('Salin kode'),

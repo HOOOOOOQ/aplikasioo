@@ -4,7 +4,6 @@ import '../../../shared/services/supabase_service.dart';
 import '../domain/app_user.dart';
 
 class AuthRepository {
-  SupabaseClient? get _client => SupabaseService.tryClient;
   SupabaseClient? get _tryClient => SupabaseService.tryClient;
 
   Future<AppUser?> getCurrentProfile() async {
