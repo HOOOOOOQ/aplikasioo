@@ -1,158 +1,220 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/widgets/loading_view.dart';
+import '../../../../core/utils/date_utils.dart';
+import '../../../../core/widgets/app_card.dart';
+import '../../../../core/widgets/app_header.dart';
+import '../../../../core/widgets/app_states.dart';
 import '../../../../shared/models/kelas.dart';
-import '../../../../shared/services/supabase_service.dart';
 import '../../../../shared/repositories/kelas_repository.dart';
 import '../../../../shared/repositories/tugas_repository.dart';
-import '../../../../shared/models/tugas.dart';
-import '../../../../core/config/supabase_config.dart';
 
-class AdminReportsPage extends StatefulWidget {
+final reportProvider = FutureProvider.autoDispose.family<List<TugasReportRow>, String?>((ref, kelasId) {
+  return TugasRepository().fetchReport(kelasId: kelasId);
+});
+
+final reportKelasProvider = FutureProvider.autoDispose<List<Kelas>>((ref) {
+  return KelasRepository().fetchAll();
+});
+
+class AdminReportsPage extends ConsumerStatefulWidget {
   const AdminReportsPage({super.key});
 
   @override
-  State<AdminReportsPage> createState() => _AdminReportsPageState();
+  ConsumerState<AdminReportsPage> createState() => _AdminReportsPageState();
 }
 
-class _AdminReportsPageState extends State<AdminReportsPage> {
-  String? _filterKelas;
-  List<Tugas> _tugas = [];
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    if (SupabaseConfig.isNotConfigured) {
-      setState(() => _loading = false);
-      return;
-    }
-    setState(() => _loading = true);
-    try {
-      final data = await TugasRepository().fetchAll(kelasId: _filterKelas);
-      if (!mounted) return;
-      setState(() { _tugas = data; _loading = false; });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _loading = false);
-    }
-  }
+class _AdminReportsPageState extends ConsumerState<AdminReportsPage> {
+  String? _kelasFilter;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Laporan Penyelesaian'), backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            FutureBuilder(
-              future: SupabaseConfig.isNotConfigured ? Future.value(<Kelas>[]) : KelasRepository().fetchAll(),
-              builder: (ctx, snap) {
-                if (snap.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
-                final list = snap.data ?? [];
-                return DropdownButtonFormField<String>(
-                  value: _filterKelas,
-                  hint: const Text('Filter Kelas'),
-                  decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
-                  items: [const DropdownMenuItem(value: null, child: Text('Semua Kelas')), ...list.map((k) => DropdownMenuItem(value: k.id, child: Text(k.namaKelas)))],
-                  onChanged: (v) { setState(() => _filterKelas = v); _load(); },
-                );
-              },
+    final kelasAsync = ref.watch(reportKelasProvider);
+    final reportAsync = ref.watch(reportProvider(_kelasFilter));
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(reportProvider);
+        ref.invalidate(reportKelasProvider);
+      },
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.xxl),
+        children: [
+          const AppHeroHeader(
+            compact: true,
+            eyebrow: 'Laporan',
+            title: 'Penyelesaian Tugas',
+            subtitle: 'Persentase dihitung dari status tugas siswa di server.',
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          kelasAsync.when(
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (kelasList) => SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  ChoiceChip(
+                    label: const Text('Semua kelas'),
+                    selected: _kelasFilter == null,
+                    onSelected: (_) => setState(() => _kelasFilter = null),
+                  ),
+                  for (final kelas in kelasList) ...[
+                    const SizedBox(width: AppSpacing.sm),
+                    ChoiceChip(
+                      label: Text(kelas.namaKelas),
+                      selected: _kelasFilter == kelas.id,
+                      onSelected: (selected) => setState(() => _kelasFilter = selected ? kelas.id : null),
+                    ),
+                  ],
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-            if (_loading)
-              const LoadingView()
-            else if (_tugas.isEmpty)
-              const Card(child: Padding(padding: EdgeInsets.all(24), child: Center(child: Text('Belum ada tugas untuk laporan'))))
-            else ...[
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          reportAsync.when(
+            loading: () => const AppSkeletonList(count: 4),
+            error: (e, _) => AppErrorState(
+              error: e,
+              onRetry: () => ref.invalidate(reportProvider(_kelasFilter)),
+            ),
+            data: (rows) {
+              if (rows.isEmpty) {
+                return const AppCard(
+                  child: AppEmptyState(
+                    icon: Icons.insights_outlined,
+                    title: 'Belum ada data laporan',
+                    subtitle: 'Laporan muncul setelah guru menerbitkan tugas.',
+                  ),
+                );
+              }
+
+              final totalSiswa = rows.fold<int>(0, (sum, row) => sum + row.totalSiswa);
+              final totalSelesai = rows.fold<int>(0, (sum, row) => sum + row.selesai);
+              final totalTerlambat = rows.fold<int>(0, (sum, row) => sum + row.terlambat);
+              final overall = totalSiswa == 0 ? 0.0 : (totalSelesai / totalSiswa) * 100;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  GridView.count(
+                    crossAxisCount: 2,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisSpacing: AppSpacing.md,
+                    mainAxisSpacing: AppSpacing.md,
+                    childAspectRatio: 1.7,
                     children: [
-                      const Text('Ringkasan Tugas', style: TextStyle(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          _statBox('Total Tugas', '${_tugas.length}', AppColors.primary),
-                          const SizedBox(width: 8),
-                          _statBox('Selesai', '—', AppColors.success),
-                          const SizedBox(width: 8),
-                          _statBox('Terlambat', '—', AppColors.error),
-                        ],
+                      MetricTile(
+                        label: 'Penyelesaian agregat',
+                        value: '${overall.toStringAsFixed(1)}%',
+                        icon: Icons.trending_up_rounded,
+                        color: AppColors.success,
+                        background: AppColors.successContainer,
                       ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        height: 200,
-                        child: PieChart(
-                          PieChartData(
-                            sections: [
-                              PieChartSectionData(color: AppColors.success, value: 40, title: 'Selesai\n40%', radius: 50, titleStyle: const TextStyle(color: Colors.white, fontSize: 11)),
-                              PieChartSectionData(color: AppColors.warning, value: 30, title: 'Mendekati\n30%', radius: 50, titleStyle: const TextStyle(color: Colors.white, fontSize: 11)),
-                              PieChartSectionData(color: AppColors.error, value: 20, title: 'Terlambat\n20%', radius: 50, titleStyle: const TextStyle(color: Colors.white, fontSize: 11)),
-                              PieChartSectionData(color: AppColors.primary, value: 10, title: 'Aktif\n10%', radius: 50, titleStyle: const TextStyle(color: Colors.white, fontSize: 11)),
+                      MetricTile(
+                        label: 'Tugas terlapor',
+                        value: '${rows.length}',
+                        icon: Icons.assignment_rounded,
+                      ),
+                      MetricTile(
+                        label: 'Sudah selesai',
+                        value: '$totalSelesai',
+                        icon: Icons.task_alt_rounded,
+                        color: AppColors.success,
+                        background: AppColors.successContainer,
+                      ),
+                      MetricTile(
+                        label: 'Terlambat dikumpulkan',
+                        value: '$totalTerlambat',
+                        icon: Icons.warning_amber_rounded,
+                        color: AppColors.warning,
+                        background: AppColors.warningContainer,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  const SectionHeader(
+                    title: 'Rincian per tugas',
+                    subtitle: 'Termasuk jumlah siswa yang belum menyelesaikan',
+                    icon: Icons.list_alt_rounded,
+                  ),
+                  ...rows.map((row) => Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                        child: AppCard(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          onTap: () => context.push('/admin/tugas/${row.tugas.id}'),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      row.tugas.judul,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                                    ),
+                                  ),
+                                  Text(
+                                    '${row.persen.toStringAsFixed(0)}%',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      color: row.persen >= 75
+                                          ? AppColors.success
+                                          : row.persen >= 40
+                                              ? AppColors.warning
+                                              : AppColors.error,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${row.tugas.kelasNama ?? '-'} • ${row.tugas.mataPelajaranNama ?? '-'} • '
+                                'Tenggat ${AppDateUtils.formatTanggal(row.tugas.tenggatWaktu)}',
+                                style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(999),
+                                child: LinearProgressIndicator(
+                                  value: (row.persen / 100).clamp(0, 1),
+                                  minHeight: 7,
+                                  backgroundColor: AppColors.surfaceMuted,
+                                  valueColor: AlwaysStoppedAnimation(
+                                    row.persen >= 75
+                                        ? AppColors.success
+                                        : row.persen >= 40
+                                            ? AppColors.warning
+                                            : AppColors.error,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${row.selesai}/${row.totalSiswa} selesai • ${row.belum} belum • ${row.terlambat} terlambat',
+                                style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
+                              ),
                             ],
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text('Catatan: Persentase dihitung dari status_tugas_siswa per tugas. Data real diambil per tugas detail.', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                    ],
+                      )),
+                  const SizedBox(height: AppSpacing.sm),
+                  const AppNotice.info(
+                    text: 'Status "selesai" hanya berasal dari laporan resmi siswa dengan kode akses. '
+                        'Status yang disimpan di perangkat siswa tidak dihitung di laporan ini.',
                   ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              for (final t in _tugas.take(20))
-                Card(
-                  child: ListTile(
-                    title: Text(t.judul, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                    subtitle: Text('${t.kelasNama} • ${t.mataPelajaranNama}', style: const TextStyle(fontSize: 12)),
-                    trailing: FutureBuilder<Map<String, int>>(
-                      future: TugasRepository().fetchSummary(t.id),
-                      builder: (ctx, snap) {
-                        if (!snap.hasData || snap.data == null) return const SizedBox(width: 40, child: LinearProgressIndicator());
-                        final m = snap.data ?? {};
-                        final total = m['total'] ?? 1;
-                        final selesai = m['selesai'] ?? 0;
-                        final pct = total == 0 ? 0 : (selesai / total * 100).round();
-                        return Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text('$pct%', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.success)),
-                            Text('$selesai/$total selesai', style: const TextStyle(fontSize: 11)),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _statBox(String label, String value, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withOpacity(0.2))),
-        child: Column(
-          children: [
-            Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: color)),
-            Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary), textAlign: TextAlign.center),
-          ],
-        ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
     );
   }

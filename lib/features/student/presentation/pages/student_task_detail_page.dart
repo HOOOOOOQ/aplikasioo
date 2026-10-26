@@ -1,287 +1,398 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/utils/app_error.dart';
 import '../../../../core/utils/date_utils.dart';
 import '../../../../core/utils/deadline_helper.dart';
+import '../../../../core/widgets/app_card.dart';
+import '../../../../core/widgets/app_header.dart';
+import '../../../../core/widgets/app_states.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
-import '../../../../core/widgets/loading_view.dart';
 import '../../../../core/widgets/status_chip.dart';
-import '../../../../core/config/supabase_config.dart';
-import '../../../../shared/repositories/tugas_repository.dart';
 import '../../../../shared/models/tugas.dart';
+import '../../../../shared/repositories/tugas_repository.dart';
+import '../../../../shared/services/attachment_service.dart';
 import '../../identity/student_identity_provider.dart';
-import '../../../notifications/notification_service.dart';
+
+final taskDetailProvider = FutureProvider.autoDispose.family<Tugas?, String>((ref, taskId) async {
+  final identity = ref.watch(studentIdentityProvider);
+  return TugasRepository().fetchById(taskId, siswaId: identity.siswaId);
+});
 
 class StudentTaskDetailPage extends ConsumerStatefulWidget {
   final String taskId;
   final bool isTeacherView;
-  const StudentTaskDetailPage({super.key, required this.taskId, this.isTeacherView = false});
+
+  /// Admin membuka tugas guru (moderasi). Tombol ubah/status tetap memakai
+  /// otorisasi server, bukan flag ini.
+  final bool adminMode;
+
+  const StudentTaskDetailPage({
+    super.key,
+    required this.taskId,
+    this.isTeacherView = false,
+    this.adminMode = false,
+  });
 
   @override
   ConsumerState<StudentTaskDetailPage> createState() => _StudentTaskDetailPageState();
 }
 
 class _StudentTaskDetailPageState extends ConsumerState<StudentTaskDetailPage> {
-  bool _loadingAction = false;
+  bool _busy = false;
 
-  Future<Tugas?> _fetch() async {
-    if (SupabaseConfig.isNotConfigured) return null;
-    final identity = ref.read(studentIdentityProvider);
-    return TugasRepository().fetchById(widget.taskId, siswaId: identity.siswaId);
-  }
-
-  Future<void> _toggleStatus(Tugas tugas) async {
-    final identity = ref.read(studentIdentityProvider);
-    final isCompleted = identity.isIdentified ? tugas.isCompleted : (ref.read(localTaskStatusProvider)[tugas.id] == 'selesai');
-    final newStatus = isCompleted ? 'belum_selesai' : 'selesai';
-
-    // If no identity, use local storage with warning
-    if (!identity.isIdentified) {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Simpan Lokal?'),
-          content: const Text('Kamu belum verifikasi identitas. Status hanya akan tersimpan di perangkat ini dan TIDAK menjadi laporan resmi untuk guru. Lanjutkan?'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
-            ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: Text(isCompleted ? 'Tandai Belum Selesai' : 'Tandai Selesai')),
-          ],
-        ),
+  Future<void> _openAttachment(Tugas tugas) async {
+    final path = tugas.lampiranPath;
+    if (path == null || path.isEmpty) return;
+    showAppSnackBar(context, 'Menyiapkan tautan lampiran…');
+    final url = await AttachmentService.signedUrl(path);
+    if (!mounted) return;
+    if (url == null) {
+      showAppSnackBar(
+        context,
+        'Lampiran tidak dapat dibuka. File mungkin terhapus atau Anda tidak punya akses.',
+        isError: true,
       );
-      if (confirmed != true) return;
-      setState(() => _loadingAction = true);
-      await ref.read(localTaskStatusProvider.notifier).setStatus(tugas.id, newStatus == 'selesai' ? 'selesai' : 'belum_selesai');
-      if (mounted) {
-        showAppSnackBar(context, newStatus == 'selesai' ? 'Ditandai selesai (lokal)' : 'Ditandai belum selesai (lokal)');
-        setState(() => _loadingAction = false);
-      }
       return;
     }
-
-    setState(() => _loadingAction = true);
-    try {
-      final repo = TugasRepository();
-      // Try secure via token, fallback direct
-      if (identity.token != null && identity.token!.startsWith('local-') == false) {
-        await repo.updateStudentStatusViaFunction(tugasId: tugas.id, siswaId: identity.siswaId!, status: newStatus, token: identity.token!);
-      } else {
-        await repo.updateStatusDirect(tugasId: tugas.id, siswaId: identity.siswaId!, status: newStatus);
-      }
-      // Selesai -> batalkan pengingat; belum selesai -> jadwalkan ulang.
-      if (newStatus == 'selesai') {
-        await NotificationService.cancelForTugas(tugas.id);
-      } else {
-        await NotificationService.scheduleForTugas(tugas);
-      }
-      if (mounted) {
-        showAppSnackBar(context, newStatus == 'selesai' ? 'Tugas ditandai selesai' : 'Tugas ditandai belum selesai');
-        setState(() {});
-      }
-    } catch (e) {
-      if (mounted) showAppSnackBar(context, 'Gagal mengubah status: ${e.toString()}', isError: true);
-    } finally {
-      if (mounted) setState(() => _loadingAction = false);
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      showAppSnackBar(context, 'Tautan lampiran tidak valid.', isError: true);
+      return;
     }
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      showAppSnackBar(context, 'Tidak ada aplikasi yang bisa membuka file ini.', isError: true);
+    }
+  }
+
+  Future<void> _setOfficialStatus(Tugas tugas, bool selesai) async {
+    final identity = ref.read(studentIdentityProvider);
+    if (!identity.isIdentified) {
+      showAppSnackBar(context, 'Verifikasi kode akses terlebih dahulu untuk laporan resmi.', isError: true);
+      return;
+    }
+    final confirmed = await showConfirmDialog(
+      context,
+      title: selesai ? 'Tandai selesai?' : 'Batalkan status selesai?',
+      content: selesai
+          ? 'Status ini dikirim ke server dan terlihat oleh guru.'
+          : 'Guru akan melihat tugas ini kembali sebagai belum selesai.',
+      confirmLabel: selesai ? 'Ya, selesai' : 'Ya, batalkan',
+      isDestructive: !selesai,
+    );
+    if (!confirmed || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      await TugasRepository().updateStudentStatusViaFunction(
+        tugasId: tugas.id,
+        siswaId: identity.siswaId!,
+        status: selesai ? 'selesai' : 'belum_selesai',
+        token: identity.token!,
+      );
+      if (!mounted) return;
+      ref.invalidate(taskDetailProvider(widget.taskId));
+      showAppSnackBar(context, selesai ? 'Tugas ditandai selesai (resmi).' : 'Status dikembalikan.');
+    } catch (e) {
+      if (!mounted) return;
+      final error = AppError.from(e);
+      showAppSnackBar(
+        context,
+        error.code == 'unauthorized' || error.message.toLowerCase().contains('sesi')
+            ? 'Sesi identitas berakhir. Verifikasi ulang kode akses di halaman Identitas.'
+            : error.shortMessage,
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _setLocalStatus(Tugas tugas, bool selesai) async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: selesai ? 'Tandai selesai di perangkat ini?' : 'Batalkan tanda selesai?',
+      content: 'Anda belum memverifikasi kode akses, jadi status ini HANYA tersimpan di perangkat ini '
+          'dan tidak dikirim ke guru. Untuk laporan resmi, verifikasi kode akses terlebih dahulu.',
+      confirmLabel: 'Mengerti',
+      isDestructive: !selesai,
+    );
+    if (!confirmed || !mounted) return;
+    await ref.read(localTaskStatusProvider.notifier).setStatus(
+          tugas.id,
+          selesai ? 'selesai' : 'belum_selesai',
+        );
+    if (!mounted) return;
+    showAppSnackBar(context, selesai ? 'Ditandai selesai (lokal).' : 'Tanda selesai dihapus.');
   }
 
   @override
   Widget build(BuildContext context) {
-    if (SupabaseConfig.isNotConfigured) {
-      return Scaffold(appBar: AppBar(title: const Text('Detail Tugas')), body: const Center(child: Text('Supabase belum dikonfigurasi')));
-    }
+    final async = ref.watch(taskDetailProvider(widget.taskId));
+    final localStatus = ref.watch(localTaskStatusProvider)[widget.taskId];
+    final identity = ref.watch(studentIdentityProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Detail Tugas')),
-      body: FutureBuilder<Tugas?>(
-        future: _fetch(),
-        builder: (ctx, snap) {
-          if (snap.connectionState == ConnectionState.waiting) return const LoadingView();
-          if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
-          final tugas = snap.data;
-          if (tugas == null) return const Center(child: Text('Tugas tidak ditemukan'));
-          final identity = ref.watch(studentIdentityProvider);
-          final locals = ref.watch(localTaskStatusProvider);
-          final isCompleted = identity.isIdentified ? tugas.isCompleted : (locals[tugas.id] == 'selesai');
-          final status = DeadlineHelper.getStatus(deadline: tugas.tenggatWaktu, isCompleted: isCompleted);
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header card
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: AppColors.primaryContainer, borderRadius: BorderRadius.circular(8)), child: Text(tugas.mataPelajaranNama ?? '-', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 12))),
-                            const Spacer(),
-                            StatusChip(status: status),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Text(tugas.judul, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Icon(Icons.person, size: 14, color: AppColors.textSecondary),
-                            const SizedBox(width: 4),
-                            Text(tugas.guruNama ?? '-', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                            const SizedBox(width: 12),
-                            const Icon(Icons.class_outlined, size: 14, color: AppColors.textSecondary),
-                            const SizedBox(width: 4),
-                            Text(tugas.kelasNama ?? '-', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                          ],
-                        ),
-                        const Divider(height: 20),
-                        _infoRow('Tanggal Pemberian', AppDateUtils.formatTanggalJam(tugas.tanggalMulai)),
-                        _infoRow('Tenggat Waktu', AppDateUtils.formatTanggalJam(tugas.tenggatWaktu)),
-                        _infoRow('Sisa Waktu', AppDateUtils.relativeDeadline(tugas.tenggatWaktu), isHighlight: true, highlightColor: DeadlineHelper.colorForStatus(status)),
-                        if (tugas.selesaiPada != null) _infoRow('Diselesaikan', AppDateUtils.formatTanggalJam(tugas.selesaiPada!)),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Deskripsi / Instruksi', style: TextStyle(fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 8),
-                        Text(tugas.deskripsi, style: const TextStyle(color: AppColors.textSecondary, height: 1.5)),
-                      ],
-                    ),
-                  ),
-                ),
-                if (tugas.lampiranPath != null) ...[
-                  const SizedBox(height: 16),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Lampiran', style: TextStyle(fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: BorderRadius.circular(12)),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.attach_file, color: AppColors.primary),
-                                const SizedBox(width: 8),
-                                Expanded(child: Text(tugas.lampiranPath ?? '-', style: const TextStyle(fontSize: 12))),
-                                TextButton(
-                                  onPressed: () async {
-                                    try {
-                                      final url = TugasRepository().getPublicUrl(tugas.lampiranPath!);
-                                      if (url.isEmpty) {
-                                        if (mounted) showAppSnackBar(context, 'Link lampiran tidak tersedia (mode demo)', isError: true);
-                                        return;
-                                      }
-                                      final uri = Uri.tryParse(url);
-                                      if (uri == null || !uri.hasScheme) {
-                                        if (mounted) showAppSnackBar(context, 'Link lampiran tidak valid', isError: true);
-                                        return;
-                                      }
-                                      if (await canLaunchUrl(uri)) {
-                                        await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                      } else {
-                                        if (mounted) showAppSnackBar(context, 'Tidak ada aplikasi untuk membuka link', isError: true);
-                                      }
-                                    } catch (e) {
-                                      if (mounted) showAppSnackBar(context, 'Gagal membuka lampiran', isError: true);
-                                    }
-                                  },
-                                  child: const Text('Buka'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+      appBar: AppBar(
+        title: const Text('Detail Tugas'),
+        actions: [
+          if (widget.isTeacherView)
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'edit') context.push('/guru/tugas/${widget.taskId}/edit');
+                if (value == 'status') context.push('/guru/tugas/${widget.taskId}/status');
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(value: 'edit', child: Text('Edit tugas')),
+                PopupMenuItem(value: 'status', child: Text('Status siswa')),
+              ],
+            ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async => ref.invalidate(taskDetailProvider(widget.taskId)),
+        child: async.when(
+          loading: () => ListView(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            children: const [SizedBox(height: AppSpacing.xl), AppSkeletonList(count: 3)],
+          ),
+          error: (e, _) => ListView(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            children: [
+              const SizedBox(height: AppSpacing.xl),
+              AppErrorState(
+                error: e,
+                onRetry: () => ref.invalidate(taskDetailProvider(widget.taskId)),
+              ),
+            ],
+          ),
+          data: (tugas) {
+            if (tugas == null) {
+              return ListView(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                children: [
+                  const SizedBox(height: AppSpacing.xxl),
+                  AppCard(
+                    child: AppEmptyState(
+                      icon: Icons.search_off_rounded,
+                      title: 'Tugas tidak ditemukan',
+                      subtitle: widget.isTeacherView
+                          ? 'Tugas sudah dihapus atau bukan milik Anda.'
+                          : 'Tugas belum diterbitkan, sudah dihapus, atau bukan untuk kelas Anda.',
+                      actionLabel: 'Kembali',
+                      onAction: () => context.canPop() ? context.pop() : context.go('/siswa'),
                     ),
                   ),
                 ],
-                const SizedBox(height: 16),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Status Penyelesaian', style: TextStyle(fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(color: DeadlineHelper.bgForStatus(status), borderRadius: BorderRadius.circular(12)),
-                          child: Row(
-                            children: [
-                              Icon(DeadlineHelper.iconForStatus(status), color: DeadlineHelper.colorForStatus(status)),
-                              const SizedBox(width: 8),
-                              Text(DeadlineHelper.labelForStatus(status), style: TextStyle(color: DeadlineHelper.colorForStatus(status), fontWeight: FontWeight.w600)),
-                              const Spacer(),
-                              Text(isCompleted ? 'Selesai' : 'Belum selesai', style: const TextStyle(fontSize: 12)),
-                            ],
-                          ),
+              );
+            }
+
+            final official = tugas.statusSiswa == 'selesai';
+            final local = localStatus == 'selesai';
+
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.xxl),
+              children: [
+                AppHeroHeader(
+                  eyebrow: '${tugas.mataPelajaranNama ?? '-'} • ${tugas.kelasNama ?? '-'}',
+                  title: tugas.judul,
+                  subtitle: 'Guru: ${tugas.guruNama ?? '-'}',
+                  footer: Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      StatusChip(
+                        status: DeadlineHelper.getStatus(
+                          deadline: tugas.tenggatWaktu,
+                          isCompleted: official || local,
                         ),
-                        if (!identity.isIdentified)
-                          Container(
-                            margin: const EdgeInsets.only(top: 8),
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(color: AppColors.warningContainer, borderRadius: BorderRadius.circular(8)),
-                            child: const Row(
+                      ),
+                      if (!widget.isTeacherView && official)
+                        const StatusSourceBadge(official: true)
+                      else if (!widget.isTeacherView && local)
+                        const StatusSourceBadge(official: false),
+                      if (widget.isTeacherView)
+                        MetaPill(
+                          label: tugas.isPublished ? 'Terbit' : (tugas.statusPublikasi == 'draft' ? 'Draft' : 'Arsip'),
+                          icon: Icons.visibility_outlined,
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionHeader(title: 'Rincian tenggat', icon: Icons.schedule_rounded),
+                      InfoRow(
+                        label: 'Mulai',
+                        value: AppDateUtils.formatTanggalJam(tugas.tanggalMulai),
+                        icon: Icons.play_circle_outline_rounded,
+                      ),
+                      InfoRow(
+                        label: 'Tenggat',
+                        value: AppDateUtils.formatTanggalJam(tugas.tenggatWaktu),
+                        icon: Icons.event_busy_rounded,
+                      ),
+                      InfoRow(
+                        label: 'Sisa waktu',
+                        value: AppDateUtils.relativeDeadline(tugas.tenggatWaktu),
+                        icon: Icons.timelapse_rounded,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionHeader(title: 'Instruksi', icon: Icons.notes_rounded),
+                      Text(
+                        tugas.deskripsi.trim().isEmpty ? 'Guru tidak menuliskan instruksi tambahan.' : tugas.deskripsi,
+                        style: const TextStyle(fontSize: 13, height: 1.6),
+                      ),
+                      if (tugas.hasLampiran) ...[
+                        const SizedBox(height: AppSpacing.lg),
+                        InkWell(
+                          onTap: _busy ? null : () => _openAttachment(tugas),
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                          child: Container(
+                            padding: const EdgeInsets.all(AppSpacing.md),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryContainer,
+                              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                            ),
+                            child: Row(
                               children: [
-                                Icon(Icons.warning_amber_rounded, size: 16, color: AppColors.warning),
-                                SizedBox(width: 8),
-                                Expanded(child: Text('Mode lokal: status tidak menjadi laporan resmi. Verifikasi kode siswa untuk laporan ke guru.', style: TextStyle(fontSize: 11, color: AppColors.warningDark))),
+                                const Icon(Icons.attach_file_rounded, color: AppColors.primaryDark),
+                                const SizedBox(width: AppSpacing.md),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        AttachmentService.displayName(tugas.lampiranPath!),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.primaryDark,
+                                        ),
+                                      ),
+                                      const Text(
+                                        'Buka lampiran (tautan aman 1 jam)',
+                                        style: TextStyle(fontSize: 10.5, color: AppColors.primaryDark),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(Icons.open_in_new_rounded, size: 16, color: AppColors.primaryDark),
                               ],
                             ),
                           ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 48,
-                          child: ElevatedButton.icon(
-                            onPressed: _loadingAction ? null : () => _toggleStatus(tugas),
-                            icon: Icon(isCompleted ? Icons.undo : Icons.check_circle),
-                            label: _loadingAction
-                                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                : Text(isCompleted ? 'Tandai Belum Selesai' : 'Tandai Selesai'),
-                            style: ElevatedButton.styleFrom(backgroundColor: isCompleted ? AppColors.textSecondary : AppColors.success),
-                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                if (!widget.isTeacherView) ...[
+                  if (!identity.isIdentified)
+                    const AppNotice.warning(
+                      title: 'Mode tanpa verifikasi',
+                      text: 'Status yang Anda tandai hanya tersimpan di perangkat ini dan tidak '
+                          'dihitung oleh guru. Verifikasi kode akses di halaman Identitas untuk '
+                          'mencatat status resmi.',
+                    )
+                  else
+                    AppNotice.success(
+                      title: 'Identitas terverifikasi',
+                      text: 'Perubahan status dikirim ke server dan tercatat sebagai laporan resmi.',
+                    ),
+                  const SizedBox(height: AppSpacing.md),
+                  if (official)
+                    OutlinedButton.icon(
+                      onPressed: _busy ? null : () => _setOfficialStatus(tugas, false),
+                      icon: const Icon(Icons.undo_rounded, size: 18),
+                      label: const Text('Batalkan status selesai'),
+                    )
+                  else if (identity.isIdentified)
+                    FilledButton.icon(
+                      onPressed: _busy ? null : () => _setOfficialStatus(tugas, true),
+                      icon: const Icon(Icons.task_alt_rounded, size: 18),
+                      label: const Text('Tandai selesai (resmi)'),
+                    )
+                  else if (local)
+                    Column(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _busy ? null : () => _setLocalStatus(tugas, false),
+                          icon: const Icon(Icons.undo_rounded, size: 18),
+                          label: const Text('Batalkan tanda selesai lokal'),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        TextButton.icon(
+                          onPressed: () => context.push('/siswa/identitas'),
+                          icon: const Icon(Icons.verified_user_outlined, size: 18),
+                          label: const Text('Verifikasi kode untuk laporan resmi'),
+                        ),
+                      ],
+                    )
+                  else
+                    Column(
+                      children: [
+                        FilledButton.icon(
+                          onPressed: _busy ? null : () => _setLocalStatus(tugas, true),
+                          icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                          label: const Text('Tandai selesai di perangkat'),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        TextButton.icon(
+                          onPressed: () => context.push('/siswa/identitas'),
+                          icon: const Icon(Icons.verified_user_outlined, size: 18),
+                          label: const Text('Verifikasi kode untuk laporan resmi'),
                         ),
                       ],
                     ),
+                  if (_busy) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    const LinearProgressIndicator(minHeight: 3),
+                  ],
+                ] else ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => context.push('/guru/tugas/${tugas.id}/edit'),
+                          icon: const Icon(Icons.edit_outlined, size: 18),
+                          label: const Text('Edit tugas'),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: () => context.push('/guru/tugas/${tugas.id}/status'),
+                          icon: const Icon(Icons.groups_rounded, size: 18),
+                          label: const Text('Status siswa'),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 24),
+                ],
               ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _infoRow(String label, String value, {bool isHighlight = false, Color? highlightColor}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(width: 130, child: Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13))),
-          const Text(': '),
-          Expanded(child: Text(value, style: TextStyle(fontSize: 13, fontWeight: isHighlight ? FontWeight.w600 : FontWeight.normal, color: highlightColor))),
-        ],
+            );
+          },
+        ),
       ),
     );
   }

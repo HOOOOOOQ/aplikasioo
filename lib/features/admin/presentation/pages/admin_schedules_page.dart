@@ -1,132 +1,241 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/utils/validators.dart';
+import '../../../../core/utils/app_error.dart';
 import '../../../../core/utils/date_utils.dart';
+import '../../../../core/widgets/app_card.dart';
+import '../../../../core/widgets/app_header.dart';
+import '../../../../core/widgets/app_states.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
-import '../../../../core/widgets/empty_state.dart';
-import '../../../../core/widgets/loading_view.dart';
 import '../../../../shared/models/jadwal.dart';
 import '../../../../shared/models/kelas.dart';
+import '../../../../shared/models/mata_pelajaran.dart';
+import '../../../../shared/repositories/akun_repository.dart';
 import '../../../../shared/repositories/jadwal_repository.dart';
 import '../../../../shared/repositories/kelas_repository.dart';
 import '../../../../shared/repositories/mapel_repository.dart';
-import '../../../../shared/services/supabase_service.dart';
-import '../../../../core/config/supabase_config.dart';
 
-class AdminSchedulesPage extends StatefulWidget {
+class AdminSchedulesPage extends ConsumerStatefulWidget {
   const AdminSchedulesPage({super.key});
 
   @override
-  State<AdminSchedulesPage> createState() => _AdminSchedulesPageState();
+  ConsumerState<AdminSchedulesPage> createState() => _AdminSchedulesPageState();
 }
 
-class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
-  List<Jadwal> _list = [];
-  bool _loading = true;
-  String? _error;
+class _AdminSchedulesPageState extends ConsumerState<AdminSchedulesPage> {
+  late Future<List<Jadwal>> _future;
+  List<Kelas> _kelas = const [];
   String? _filterKelas;
   String? _filterHari;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _future = _load();
+    _loadKelas();
   }
 
-  Future<void> _load() async {
-    if (SupabaseConfig.isNotConfigured) {
-      setState(() { _loading = false; _error = 'Supabase belum dikonfigurasi'; });
-      return;
-    }
-    setState(() { _loading = true; _error = null; });
+  Future<void> _loadKelas() async {
     try {
-      final d = await JadwalRepository().fetchAll(kelasId: _filterKelas, hari: _filterHari);
-      if (!mounted) return;
-      setState(() { _list = d; _loading = false; });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() { _loading = false; _error = e.toString(); });
-    }
+      final list = await KelasRepository().fetchAll();
+      if (mounted) setState(() => _kelas = list);
+    } catch (_) {}
   }
+
+  Future<List<Jadwal>> _load() => JadwalRepository().fetchAll(kelasId: _filterKelas, hari: _filterHari);
+
+  Future<void> _refresh() async {
+    setState(() => _future = _load());
+    await _future;
+  }
+
+  TimeOfDay _parseTime(String value, {TimeOfDay fallback = const TimeOfDay(hour: 7, minute: 0)}) {
+    final parts = value.split(':');
+    if (parts.length < 2) return fallback;
+    return TimeOfDay(
+      hour: int.tryParse(parts[0]) ?? fallback.hour,
+      minute: int.tryParse(parts[1]) ?? fallback.minute,
+    );
+  }
+
+  String _formatTime(TimeOfDay time) =>
+      '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}:00';
 
   Future<void> _showForm({Jadwal? existing}) async {
-    if (!SupabaseService.isReady) {
-      showAppSnackBar(context, 'Supabase belum dikonfigurasi', isError: true);
-      return;
-    }
-    final kelasList = await KelasRepository().fetchAll();
-    final mapelList = await MapelRepository().fetchAll();
-    if (kelasList.isEmpty || mapelList.isEmpty) {
-      if (mounted) showAppSnackBar(context, 'Data kelas/mapel belum tersedia', isError: true);
-      return;
-    }
-    final tryC = SupabaseService.tryClient;
-    if (tryC == null) throw Exception('Supabase belum siap');
-    final guruData = await tryC.from('profiles').select('id, full_name').eq('role', 'guru');
-    final gurus = (guruData as List).cast<Map<String, dynamic>>();
-
-    String? kelasId = existing?.kelasId ?? kelasList.firstOrNull?.id;
-    String? guruId = existing?.guruId ?? gurus.firstOrNull?['id'] as String?;
-    String? mapelId = existing?.mataPelajaranId ?? mapelList.firstOrNull?.id;
-    String hari = existing?.hari ?? 'Senin';
-    final jamMulaiC = TextEditingController(text: existing != null ? AppDateUtils.formatJamFromString(existing.jamMulai) : '07:00');
-    final jamSelesaiC = TextEditingController(text: existing != null ? AppDateUtils.formatJamFromString(existing.jamSelesai) : '08:00');
-    final ruangC = TextEditingController(text: existing?.ruang ?? '');
-    final formKey = GlobalKey<FormState>();
-
+    final resultados = await Future.wait([
+      KelasRepository().fetchAll(),
+      MapelRepository().fetchAll(),
+      ref.read(akunRepositoryProvider).fetchProfiles(role: 'guru'),
+    ]);
     if (!mounted) return;
-    final ok = await showDialog<bool>(
+
+    final kelasList = resultados[0] as List<Kelas>;
+    final mapelList = resultados[1] as List<MataPelajaran>;
+    final gurus = resultados[2] as List<ProfileRow>;
+
+    if (kelasList.isEmpty || mapelList.isEmpty || gurus.isEmpty) {
+      showAppSnackBar(context, 'Lengkapi kelas, mata pelajaran, dan akun guru terlebih dahulu.', isError: true);
+      return;
+    }
+
+    final formKey = GlobalKey<FormState>();
+    var kelasId = existing?.kelasId ?? kelasList.first.id;
+    var mapelId = existing?.mataPelajaranId ?? mapelList.first.id;
+    var guruId = existing?.guruId ?? gurus.first.id;
+    var hari = existing?.hari ?? 'Senin';
+    var mulai = _parseTime(existing?.jamMulai ?? '07:00:00');
+    var selesai = _parseTime(existing?.jamSelesai ?? '08:30:00');
+    final ruangC = TextEditingController(text: existing?.ruang ?? '');
+
+    final saved = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(existing == null ? 'Tambah Jadwal' : 'Edit Jadwal'),
-        content: SingleChildScrollView(
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(value: kelasId, decoration: const InputDecoration(labelText: 'Kelas *'), items: kelasList.map((k) => DropdownMenuItem(value: k.id, child: Text(k.namaKelas))).toList(), onChanged: (v) => kelasId = v, validator: (v) => Validators.requiredField(v, fieldName: 'Kelas')),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(value: hari, decoration: const InputDecoration(labelText: 'Hari *'), items: AppDateUtils.daftarHari.map((h) => DropdownMenuItem(value: h, child: Text(h))).toList(), onChanged: (v) { if (v != null) hari = v; }),
-                const SizedBox(height: 12),
-                Row(children: [
-                  Expanded(child: TextFormField(controller: jamMulaiC, decoration: const InputDecoration(labelText: 'Jam Mulai (HH:mm) *'), validator: (v) => Validators.requiredField(v, fieldName: 'Jam Mulai'))),
-                  const SizedBox(width: 8),
-                  Expanded(child: TextFormField(controller: jamSelesaiC, decoration: const InputDecoration(labelText: 'Jam Selesai (HH:mm) *'), validator: (v) => Validators.requiredField(v, fieldName: 'Jam Selesai'))),
-                ]),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(value: guruId, decoration: const InputDecoration(labelText: 'Guru *'), items: gurus.map((g) => DropdownMenuItem(value: g['id']?.toString() ?? '', child: Text(g['full_name']?.toString() ?? '-'))).toList(), onChanged: (v) => guruId = v, validator: (v) => Validators.requiredField(v, fieldName: 'Guru')),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(value: mapelList.any((m) => m.id == mapelId) ? mapelId : null, decoration: const InputDecoration(labelText: 'Mata Pelajaran *'), items: mapelList.map((m) => DropdownMenuItem(value: m.id, child: Text(m.namaMapel))).toList(), onChanged: (v) => mapelId = v, validator: (v) => Validators.requiredField(v, fieldName: 'Mapel')),
-                const SizedBox(height: 12),
-                TextFormField(controller: ruangC, decoration: const InputDecoration(labelText: 'Ruang')),
-              ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(existing == null ? 'Tambah jadwal' : 'Edit jadwal'),
+          content: SizedBox(
+            width: 440,
+            child: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: kelasId,
+                      decoration: const InputDecoration(labelText: 'Kelas'),
+                      items: kelasList.map((k) => DropdownMenuItem(value: k.id, child: Text(k.namaKelas))).toList(),
+                      onChanged: (v) => setDialogState(() => kelasId = v!),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    DropdownButtonFormField<String>(
+                      value: mapelId,
+                      decoration: const InputDecoration(labelText: 'Mata pelajaran'),
+                      items: mapelList.map((m) => DropdownMenuItem(value: m.id, child: Text(m.namaMapel))).toList(),
+                      onChanged: (v) => setDialogState(() => mapelId = v!),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    DropdownButtonFormField<String>(
+                      value: guruId,
+                      decoration: const InputDecoration(labelText: 'Guru pengampu'),
+                      items: gurus.map((g) => DropdownMenuItem(value: g.id, child: Text(g.fullName))).toList(),
+                      onChanged: (v) => setDialogState(() => guruId = v!),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    DropdownButtonFormField<String>(
+                      value: hari,
+                      decoration: const InputDecoration(labelText: 'Hari'),
+                      items: AppDateUtils.daftarHari
+                          .map((h) => DropdownMenuItem(value: h, child: Text(h)))
+                          .toList(),
+                      onChanged: (v) => setDialogState(() => hari = v!),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final picked = await showTimePicker(context: ctx, initialTime: mulai);
+                              if (picked != null) setDialogState(() => mulai = picked);
+                            },
+                            icon: const Icon(Icons.schedule_rounded, size: 17),
+                            label: Text('Mulai ${mulai.format(ctx)}'),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final picked = await showTimePicker(context: ctx, initialTime: selesai);
+                              if (picked != null) setDialogState(() => selesai = picked);
+                            },
+                            icon: const Icon(Icons.schedule_rounded, size: 17),
+                            label: Text('Selesai ${selesai.format(ctx)}'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    TextFormField(
+                      controller: ruangC,
+                      decoration: const InputDecoration(labelText: 'Ruang (opsional)', hintText: 'Mis. Lab 2'),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    const AppNotice.info(
+                      text: 'Server menolak jadwal yang bentrok untuk kelas atau guru yang sama '
+                          'pada hari dan jam yang sama.',
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+            FilledButton(
+              onPressed: () {
+                if (!(formKey.currentState?.validate() ?? false)) return;
+                final minutesA = mulai.hour * 60 + mulai.minute;
+                final minutesB = selesai.hour * 60 + selesai.minute;
+                if (minutesB <= minutesA) {
+                  showAppSnackBar(ctx, 'Jam selesai harus setelah jam mulai.', isError: true);
+                  return;
+                }
+                Navigator.pop(ctx, true);
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
-          ElevatedButton(onPressed: () {
-            final timeErr = Validators.timeRange(jamMulaiC.text, jamSelesaiC.text);
-            if (timeErr != null) { ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(timeErr))); return; }
-            if (formKey.currentState?.validate() ?? false) Navigator.pop(ctx, true);
-          }, child: Text(existing == null ? 'Tambah' : 'Simpan')),
-        ],
       ),
     );
-    if (ok != true) return;
+
+    final ruang = ruangC.text.trim();
+    ruangC.dispose();
+    if (saved != true) return;
+
+    final payload = {
+      'kelas_id': kelasId,
+      'mata_pelajaran_id': mapelId,
+      'guru_id': guruId,
+      'hari': hari,
+      'jam_mulai': _formatTime(mulai),
+      'jam_selesai': _formatTime(selesai),
+      'ruang': ruang.isEmpty ? null : ruang,
+    };
+
     try {
-      final payload = {'kelas_id': kelasId, 'guru_id': guruId, 'mata_pelajaran_id': mapelId, 'hari': hari, 'jam_mulai': '${jamMulaiC.text}:00', 'jam_selesai': '${jamSelesaiC.text}:00', 'ruang': ruangC.text.trim().isEmpty ? null : ruangC.text.trim()};
       if (existing == null) {
         await JadwalRepository().create(payload);
-        if (mounted) showAppSnackBar(context, 'Jadwal ditambahkan');
       } else {
         await JadwalRepository().update(existing.id, payload);
-        if (mounted) showAppSnackBar(context, 'Jadwal diperbarui');
       }
-      _load();
+      if (!mounted) return;
+      showAppSnackBar(context, existing == null ? 'Jadwal ditambahkan.' : 'Jadwal diperbarui.');
+      await _refresh();
     } catch (e) {
-      if (mounted) showAppSnackBar(context, 'Gagal: $e', isError: true);
+      if (!mounted) return;
+      showAppSnackBar(context, AppError.from(e).shortMessage, isError: true);
+    }
+  }
+
+  Future<void> _delete(Jadwal jadwal) async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Hapus jadwal?',
+      content: '${jadwal.mataPelajaranNama ?? '-'} • ${jadwal.hari} '
+          '${AppDateUtils.formatJamFromString(jadwal.jamMulai)}–${AppDateUtils.formatJamFromString(jadwal.jamSelesai)}',
+    );
+    if (!confirmed) return;
+    try {
+      await JadwalRepository().delete(jadwal.id);
+      if (!mounted) return;
+      showAppSnackBar(context, 'Jadwal dihapus.');
+      await _refresh();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(context, AppError.from(e).shortMessage, isError: true);
     }
   }
 
@@ -134,88 +243,156 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Jadwal Pelajaran'), backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-      floatingActionButton: FloatingActionButton.extended(onPressed: () => _showForm(), icon: const Icon(Icons.add), label: const Text('Tambah Jadwal')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showForm(),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Tambah jadwal'),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: FutureBuilder<List<Jadwal>>(
+          future: _future,
+          builder: (context, snapshot) {
+            final list = snapshot.data ?? const <Jadwal>[];
+            final grouped = <String, List<Jadwal>>{};
+            for (final item in list) {
+              grouped.putIfAbsent(item.hari, () => []).add(item);
+            }
+
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 110),
               children: [
-                Expanded(
-                  child: FutureBuilder(
-                    future: SupabaseConfig.isNotConfigured ? Future.value(<Kelas>[]) : KelasRepository().fetchAll(),
-                    builder: (ctx, snap) {
-                      final list = snap.data ?? [];
-                      return DropdownButtonFormField<String>(
+                AppHeroHeader(
+                  compact: true,
+                  eyebrow: 'Jadwal sekolah',
+                  title: 'Jadwal Pelajaran',
+                  subtitle: '${list.length} slot jadwal • anti-bentrok otomatis di server.',
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String?>(
                         value: _filterKelas,
-                        hint: const Text('Filter Kelas'),
-                        decoration: InputDecoration(contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-                        items: [const DropdownMenuItem(value: null, child: Text('Semua Kelas')), ...list.map((k) => DropdownMenuItem(value: k.id, child: Text(k.namaKelas)))],
-                        onChanged: (v) { setState(() => _filterKelas = v); _load(); },
-                      );
-                    },
-                  ),
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: 'Kelas', contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+                        items: [
+                          const DropdownMenuItem(value: null, child: Text('Semua kelas')),
+                          ..._kelas.map((k) => DropdownMenuItem(value: k.id, child: Text(k.namaKelas))),
+                        ],
+                        onChanged: (value) {
+                          setState(() => _filterKelas = value);
+                          _refresh();
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: DropdownButtonFormField<String?>(
+                        value: _filterHari,
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: 'Hari', contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+                        items: [
+                          const DropdownMenuItem(value: null, child: Text('Semua hari')),
+                          ...AppDateUtils.daftarHari.map((h) => DropdownMenuItem(value: h, child: Text(h))),
+                        ],
+                        onChanged: (value) {
+                          setState(() => _filterHari = value);
+                          _refresh();
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _filterHari,
-                    hint: const Text('Filter Hari'),
-                    decoration: InputDecoration(contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-                    items: [const DropdownMenuItem(value: null, child: Text('Semua Hari')), ...AppDateUtils.daftarHari.map((h) => DropdownMenuItem(value: h, child: Text(h)))],
-                    onChanged: (v) { setState(() => _filterHari = v); _load(); },
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: _loading
-                ? const LoadingView()
-                : _error != null
-                    ? ErrorState(message: _error!, onRetry: _load)
-                    : _list.isEmpty
-                        ? const EmptyState(icon: Icons.calendar_month, title: 'Belum Ada Jadwal', subtitle: 'Tambahkan jadwal untuk menampilkan ke siswa dan guru.')
-                        : ListView.builder(
-                            padding: const EdgeInsets.all(12),
-                            itemCount: _list.length,
-                            itemBuilder: (ctx, i) {
-                              final j = _list[i];
-                              return Card(
-                                child: ListTile(
-                                  leading: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), decoration: BoxDecoration(color: AppColors.primaryContainer, borderRadius: BorderRadius.circular(8)), child: Text(j.hari.length >= 3 ? j.hari.substring(0, 3) : j.hari, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 11))),
-                                  title: Text('${j.mataPelajaranNama ?? "-"} • ${AppDateUtils.formatJamFromString(j.jamMulai)}-${AppDateUtils.formatJamFromString(j.jamSelesai)}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                                  subtitle: Text('${j.kelasNama ?? "-"} • ${j.guruNama ?? "-"} • ${j.ruang ?? "-"}', style: const TextStyle(fontSize: 12)),
-                                  trailing: PopupMenuButton(
-                                    itemBuilder: (ctx) => const [PopupMenuItem(value: 'edit', child: Text('Edit')), PopupMenuItem(value: 'hapus', child: Text('Hapus'))],
-                                    onSelected: (v) async {
-                                      if (v == 'edit') _showForm(existing: j);
-                                      if (v == 'hapus') {
-                                        final ok = await showConfirmDialog(context, title: 'Hapus Jadwal?', content: 'Hapus jadwal ${j.mataPelajaranNama} hari ${j.hari}?');
-                                        if (ok) {
-                                          try {
-                                            await JadwalRepository().delete(j.id);
-                                            if (mounted) showAppSnackBar(context, 'Jadwal dihapus');
-                                            _load();
-                                          } catch (e) {
-                                            if (mounted) showAppSnackBar(context, 'Gagal: $e', isError: true);
-                                          }
-                                        }
-                                      }
-                                    },
+                const SizedBox(height: AppSpacing.md),
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  const AppSkeletonList(count: 4)
+                else if (snapshot.hasError)
+                  AppErrorState(error: snapshot.error, onRetry: _refresh)
+                else if (list.isEmpty)
+                  AppCard(
+                    child: AppEmptyState(
+                      icon: Icons.calendar_month_outlined,
+                      title: 'Belum ada jadwal',
+                      subtitle: 'Tambahkan jadwal agar guru dan siswa melihat pelajaran harian.',
+                      actionLabel: 'Tambah jadwal',
+                      onAction: () => _showForm(),
+                    ),
+                  )
+                else
+                  ...grouped.entries.map((entry) => Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SectionHeader(title: entry.key, subtitle: '${entry.value.length} pelajaran'),
+                          ...entry.value.map((jadwal) => Padding(
+                                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                                child: AppCard(
+                                  padding: const EdgeInsets.all(AppSpacing.md),
+                                  child: Row(
+                                    children: [
+                                      Column(
+                                        children: [
+                                          Text(
+                                            AppDateUtils.formatJamFromString(jadwal.jamMulai),
+                                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                                          ),
+                                          Text(
+                                            AppDateUtils.formatJamFromString(jadwal.jamSelesai),
+                                            style: const TextStyle(fontSize: 10.5, color: AppColors.textTertiary),
+                                          ),
+                                        ],
+                                      ),
+                                      Container(
+                                        width: 3,
+                                        height: 42,
+                                        margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary.withValues(alpha: 0.35),
+                                          borderRadius: BorderRadius.circular(999),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              jadwal.mataPelajaranNama ?? '-',
+                                              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                                            ),
+                                            Text(
+                                              '${jadwal.kelasNama ?? '-'} • ${jadwal.guruNama ?? '-'}'
+                                              '${jadwal.ruang != null && jadwal.ruang!.isNotEmpty ? ' • ${jadwal.ruang}' : ''}',
+                                              style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      PopupMenuButton<String>(
+                                        onSelected: (value) {
+                                          if (value == 'edit') _showForm(existing: jadwal);
+                                          if (value == 'delete') _delete(jadwal);
+                                        },
+                                        itemBuilder: (context) => const [
+                                          PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                          PopupMenuItem(
+                                            value: 'delete',
+                                            child: Text('Hapus', style: TextStyle(color: AppColors.error)),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              );
-                            },
-                          ),
-          ),
-        ],
+                              )),
+                          const SizedBox(height: AppSpacing.sm),
+                        ],
+                      )),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
-}
-
-extension _FirstOrNull<E> on List<E> {
-  E? get firstOrNull => isEmpty ? null : first;
 }

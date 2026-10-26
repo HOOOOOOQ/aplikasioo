@@ -10,7 +10,7 @@ extension UserRoleX on UserRole {
       case UserRole.guru:
         return 'Guru';
       case UserRole.unknown:
-        return 'Unknown';
+        return 'Tidak dikenal';
     }
   }
 

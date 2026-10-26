@@ -55,7 +55,7 @@ file ZIP / file hasil ekstraksi yang salah. Sekarang setiap build menerbitkan fi
 ### Verifikasi checksum (opsional, di HP)
 Aplikasi seperti *Hash Droid* / Termux:
 ```
-sha256sum EduTask-1.0.0-arm64-v8a.apk
+sha256sum EduTask-1.1.0-arm64-v8a.apk
 ```
 Bandingkan dengan isi `SHA256SUMS.txt` di halaman Release (format siap pakai:
 `sha256sum -c SHA256SUMS.txt`). Jika berbeda → unduhan korup, unduh ulang.

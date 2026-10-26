@@ -1,108 +1,184 @@
 import 'package:flutter/material.dart';
-import '../../../../core/constants/app_colors.dart';
-import '../../../../core/utils/validators.dart';
-import '../../../../core/widgets/confirm_dialog.dart';
-import '../../../../core/widgets/empty_state.dart';
-import '../../../../core/widgets/loading_view.dart';
-import '../../../../shared/models/kelas.dart';
-import '../../../../shared/repositories/kelas_repository.dart';
-import '../../../../shared/services/supabase_service.dart';
-import '../../../../core/config/supabase_config.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class AdminClassesPage extends StatefulWidget {
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/utils/app_error.dart';
+import '../../../../core/utils/validators.dart';
+import '../../../../core/widgets/app_card.dart';
+import '../../../../core/widgets/app_header.dart';
+import '../../../../core/widgets/app_states.dart';
+import '../../../../core/widgets/confirm_dialog.dart';
+import '../../../../shared/models/kelas.dart';
+import '../../../../shared/repositories/akun_repository.dart';
+import '../../../../shared/repositories/kelas_repository.dart';
+
+class AdminClassesPage extends ConsumerStatefulWidget {
   const AdminClassesPage({super.key});
 
   @override
-  State<AdminClassesPage> createState() => _AdminClassesPageState();
+  ConsumerState<AdminClassesPage> createState() => _AdminClassesPageState();
 }
 
-class _AdminClassesPageState extends State<AdminClassesPage> {
-  List<Kelas> _list = [];
-  bool _loading = true;
-  String? _error;
+class _AdminClassesPageState extends ConsumerState<AdminClassesPage> {
+  final TextEditingController _searchC = TextEditingController();
+  late Future<List<Kelas>> _future;
+  Map<String, int> _jumlahSiswa = const {};
+  String _search = '';
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _future = _load();
   }
 
-  Future<void> _load() async {
-    if (SupabaseConfig.isNotConfigured) {
-      setState(() { _loading = false; _error = 'Supabase belum dikonfigurasi'; });
-      return;
-    }
-    setState(() { _loading = true; _error = null; });
-    try {
-      final data = await KelasRepository().fetchAll();
-      if (!mounted) return;
-      setState(() { _list = data; _loading = false; });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() { _loading = false; _error = e.toString(); });
-    }
+  @override
+  void dispose() {
+    _searchC.dispose();
+    super.dispose();
+  }
+
+  Future<List<Kelas>> _load() async {
+    final repo = KelasRepository();
+    final results = await Future.wait([repo.fetchAll(), repo.countSiswaPerKelas()]);
+    _jumlahSiswa = results[1] as Map<String, int>;
+    return results[0] as List<Kelas>;
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _future = _load());
+    await _future;
   }
 
   Future<void> _showForm({Kelas? existing}) async {
+    List<ProfileRow> gurus;
+    try {
+      gurus = await ref.read(akunRepositoryProvider).fetchProfiles(role: 'guru');
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(context, AppError.from(e).shortMessage, isError: true);
+      return;
+    }
+    if (!mounted) return;
+
+    final formKey = GlobalKey<FormState>();
     final namaC = TextEditingController(text: existing?.namaKelas ?? '');
     final tingkatC = TextEditingController(text: existing?.tingkat ?? '');
-    final tahunC = TextEditingController(text: existing?.tahunAjaran ?? '2024/2025');
-    final formKey = GlobalKey<FormState>();
-    String? waliKelasId = existing?.waliKelasId;
-    List<Map<String, dynamic>> gurus = [];
-    try {
-      final c = SupabaseService.tryClient;
-      if (c != null) {
-        final d = await c.from('profiles').select('id, full_name').eq('role', 'guru');
-        gurus = (d as List).cast<Map<String, dynamic>>();
-      }
-    } catch (_) {}
+    final tahunC = TextEditingController(text: existing?.tahunAjaran ?? '');
+    var waliId = existing?.waliKelasId;
 
-    if (!mounted) return;
-    final ok = await showDialog<bool>(
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(existing == null ? 'Tambah Kelas' : 'Edit Kelas'),
-        content: SingleChildScrollView(
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(controller: namaC, decoration: const InputDecoration(labelText: 'Nama Kelas *'), validator: (v) => Validators.requiredField(v, fieldName: 'Nama Kelas')),
-                const SizedBox(height: 12),
-                TextFormField(controller: tingkatC, decoration: const InputDecoration(labelText: 'Tingkat (misal: 7, 8, 9)')),
-                const SizedBox(height: 12),
-                TextFormField(controller: tahunC, decoration: const InputDecoration(labelText: 'Tahun Ajaran')),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: gurus.any((g) => (g['id']?.toString() ?? '') == waliKelasId) ? waliKelasId : null,
-                  decoration: const InputDecoration(labelText: 'Wali Kelas (opsional)'),
-                  items: [const DropdownMenuItem<String>(value: null, child: Text('- Tidak ada -')), ...gurus.map((g) => DropdownMenuItem(value: g['id']?.toString() ?? '', child: Text(g['full_name']?.toString() ?? '-')))],
-                  onChanged: (v) => waliKelasId = v,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(existing == null ? 'Tambah kelas' : 'Edit kelas'),
+          content: SizedBox(
+            width: 420,
+            child: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: namaC,
+                      decoration: const InputDecoration(labelText: 'Nama kelas', hintText: 'Mis. X PPLG 1'),
+                      validator: (v) => Validators.nama(v, field: 'Nama kelas'),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: tingkatC,
+                            decoration: const InputDecoration(labelText: 'Tingkat', hintText: 'X / XI / XII'),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: TextFormField(
+                            controller: tahunC,
+                            decoration: const InputDecoration(labelText: 'Tahun ajaran', hintText: '2026/2027'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    DropdownButtonFormField<String>(
+                      value: waliId,
+                      decoration: const InputDecoration(labelText: 'Wali kelas (opsional)'),
+                      items: gurus
+                          .map((g) => DropdownMenuItem(value: g.id, child: Text(g.fullName)))
+                          .toList(),
+                      onChanged: (v) => setDialogState(() => waliId = v),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+            FilledButton(
+              onPressed: () {
+                if (!(formKey.currentState?.validate() ?? false)) return;
+                Navigator.pop(ctx, {
+                  'nama_kelas': namaC.text.trim(),
+                  'tingkat': tingkatC.text.trim().isEmpty ? null : tingkatC.text.trim(),
+                  'tahun_ajaran': tahunC.text.trim().isEmpty ? null : tahunC.text.trim(),
+                  'wali_kelas_id': waliId,
+                });
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
-          ElevatedButton(onPressed: () { if (formKey.currentState?.validate() ?? false) Navigator.pop(ctx, true); }, child: Text(existing == null ? 'Tambah' : 'Simpan')),
-        ],
       ),
     );
-    if (ok != true) return;
+
+    namaC.dispose();
+    tingkatC.dispose();
+    tahunC.dispose();
+    if (result == null) return;
+
     try {
       if (existing == null) {
-        await KelasRepository().create(namaKelas: namaC.text.trim(), tingkat: tingkatC.text.trim().isEmpty ? null : tingkatC.text.trim(), tahunAjaran: tahunC.text.trim(), waliKelasId: waliKelasId);
-        if (mounted) showAppSnackBar(context, 'Kelas ditambahkan');
+        await KelasRepository().create(
+          namaKelas: result['nama_kelas'] as String,
+          tingkat: result['tingkat'] as String?,
+          tahunAjaran: result['tahun_ajaran'] as String?,
+          waliKelasId: result['wali_kelas_id'] as String?,
+        );
       } else {
-        await KelasRepository().update(existing.id, {'nama_kelas': namaC.text.trim(), 'tingkat': tingkatC.text.trim(), 'tahun_ajaran': tahunC.text.trim(), 'wali_kelas_id': waliKelasId});
-        if (mounted) showAppSnackBar(context, 'Kelas diperbarui');
+        await KelasRepository().update(existing.id, result);
       }
-      _load();
+      if (!mounted) return;
+      showAppSnackBar(context, existing == null ? 'Kelas ditambahkan.' : 'Kelas diperbarui.');
+      await _refresh();
     } catch (e) {
-      if (mounted) showAppSnackBar(context, 'Gagal: $e', isError: true);
+      if (!mounted) return;
+      showAppSnackBar(context, AppError.from(e).shortMessage, isError: true);
+    }
+  }
+
+  Future<void> _delete(Kelas kelas) async {
+    final jumlah = _jumlahSiswa[kelas.id] ?? 0;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Hapus ${kelas.namaKelas}?',
+      content: jumlah > 0
+          ? 'Kelas ini memiliki $jumlah siswa. Siswa akan kehilangan kelas dan tugas '
+              'terkait kelas ini juga terhapus. Tindakan ini tidak bisa dibatalkan.'
+          : 'Jadwal dan tugas terkait kelas ini juga akan terhapus.',
+    );
+    if (!confirmed) return;
+    try {
+      await KelasRepository().delete(kelas.id);
+      if (!mounted) return;
+      showAppSnackBar(context, 'Kelas dihapus.');
+      await _refresh();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(context, AppError.from(e).shortMessage, isError: true);
     }
   }
 
@@ -110,46 +186,110 @@ class _AdminClassesPageState extends State<AdminClassesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Data Kelas'), backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-      floatingActionButton: FloatingActionButton.extended(onPressed: () => _showForm(), icon: const Icon(Icons.add), label: const Text('Tambah Kelas')),
-      body: _loading
-          ? const LoadingView()
-          : _error != null
-              ? ErrorState(message: _error!, onRetry: _load)
-              : _list.isEmpty
-                  ? const EmptyState(icon: Icons.class_, title: 'Belum Ada Kelas', subtitle: 'Tambahkan kelas untuk mengelola siswa, jadwal, dan tugas.')
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: _list.length,
-                      itemBuilder: (ctx, i) {
-                        final k = _list[i];
-                        return Card(
-                          child: ListTile(
-                            leading: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: AppColors.primaryContainer, borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.class_, color: AppColors.primary)),
-                            title: Text(k.namaKelas, style: const TextStyle(fontWeight: FontWeight.w600)),
-                            subtitle: Text('${k.tingkat ?? "-"} • ${k.tahunAjaran ?? "-"} • Wali: ${k.waliKelasNama ?? "-"}'),
-                            trailing: PopupMenuButton(
-                              itemBuilder: (ctx) => const [PopupMenuItem(value: 'edit', child: Text('Edit')), PopupMenuItem(value: 'hapus', child: Text('Hapus'))],
-                              onSelected: (v) async {
-                                if (v == 'edit') _showForm(existing: k);
-                                if (v == 'hapus') {
-                                  final ok = await showConfirmDialog(context, title: 'Hapus Kelas?', content: 'Hapus ${k.namaKelas}? Pastikan tidak ada siswa/jadwal terkait.');
-                                  if (ok) {
-                                    try {
-                                      await KelasRepository().delete(k.id);
-                                      if (mounted) showAppSnackBar(context, 'Kelas dihapus');
-                                      _load();
-                                    } catch (e) {
-                                      if (mounted) showAppSnackBar(context, 'Gagal: $e', isError: true);
-                                    }
-                                  }
-                                }
-                              },
-                            ),
-                          ),
-                        );
-                      },
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showForm(),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Tambah kelas'),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: FutureBuilder<List<Kelas>>(
+          future: _future,
+          builder: (context, snapshot) {
+            var list = snapshot.data ?? const <Kelas>[];
+            if (_search.trim().isNotEmpty) {
+              final needle = _search.trim().toLowerCase();
+              list = list.where((k) => k.namaKelas.toLowerCase().contains(needle)).toList();
+            }
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 110),
+              children: [
+                AppHeroHeader(
+                  compact: true,
+                  eyebrow: 'Struktur sekolah',
+                  title: 'Manajemen Kelas',
+                  subtitle: '${snapshot.data?.length ?? 0} kelas terdaftar.',
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                AppSearchField(
+                  controller: _searchC,
+                  hint: 'Cari kelas…',
+                  onChanged: (value) => setState(() => _search = value),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  const AppSkeletonList(count: 4)
+                else if (snapshot.hasError)
+                  AppErrorState(error: snapshot.error, onRetry: _refresh)
+                else if (list.isEmpty)
+                  AppCard(
+                    child: AppEmptyState(
+                      icon: Icons.class_outlined,
+                      title: 'Belum ada kelas',
+                      subtitle: 'Kelas diperlukan untuk siswa, jadwal, dan tugas.',
+                      actionLabel: 'Tambah kelas',
+                      onAction: () => _showForm(),
                     ),
+                  )
+                else
+                  ...list.map((kelas) => Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                        child: AppCard(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryContainer,
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                                ),
+                                child: const Icon(Icons.class_rounded, size: 20, color: AppColors.primary),
+                              ),
+                              const SizedBox(width: AppSpacing.md),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(kelas.namaKelas,
+                                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${_jumlahSiswa[kelas.id] ?? 0} siswa • Wali: ${kelas.waliKelasNama ?? '-'}',
+                                      style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                                    ),
+                                    if (kelas.tingkat != null || kelas.tahunAjaran != null)
+                                      Text(
+                                        '${kelas.tingkat ?? '-'} • ${kelas.tahunAjaran ?? '-'}',
+                                        style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuButton<String>(
+                                onSelected: (value) {
+                                  if (value == 'edit') _showForm(existing: kelas);
+                                  if (value == 'delete') _delete(kelas);
+                                },
+                                itemBuilder: (context) => const [
+                                  PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                  PopupMenuItem(
+                                    value: 'delete',
+                                    child: Text('Hapus', style: TextStyle(color: AppColors.error)),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      )),
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 }

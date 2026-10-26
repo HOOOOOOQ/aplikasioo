@@ -1,113 +1,116 @@
-# APK EduTask gagal dipasang — "Ada masalah saat mengurai paket"
+# EduTask
 
-Dokumen ini menjelaskan penyebab nyata, perbaikan yang sudah dilakukan di repo, dan
-langkah verifikasi manual.
+**Tugas & Jadwal Sekolah** — aplikasi Flutter + Supabase untuk mengelola jadwal pelajaran,
+tugas, lampiran, kode akses siswa, dan laporan penyelesaian tugas.
 
----
-
-## 1. Penyebab yang sudah diperbaiki di repo
-
-### A. Tanda tangan APK berubah setiap build (penyebab utama)
-Sebelumnya `android/app/build.gradle` memakai:
-
-```gradle
-buildTypes { release { signingConfig signingConfigs.debug } }
-```
-
-Runner GitHub Actions selalu bersih, jadi `~/.android/debug.keystore` **dibuat ulang setiap
-run** → setiap APK punya sertifikat berbeda. Memasang APK baru di atas aplikasi yang sudah
-terpasang akan ditolak Package Manager. Beberapa OEM (MIUI/Realme/Oppo) menampilkan
-penolakan ini sebagai **"Ada masalah saat mengurai paket"**, bukan pesan signature.
-
-Perbaikan: release sekarang memakai keystore **stabil** `android/app/edutask-signing.p12`
-(dapat ditimpa lewat `android/key.properties` atau secret `ANDROID_KEYSTORE_BASE64`).
-Semua build berikutnya bisa menimpa build sebelumnya tanpa uninstall.
-
-### B. Skema tanda tangan & minSdk
-Flutter 3.35 **memaksa `flutter.minSdkVersion = 24`** dan menimpa nilai di bawahnya, jadi APK
-ini adalah **Android 7.0 (API 24)+**. Karena itu v1 (JAR) signature tidak wajib — Android 7+
-memverifikasi lewat **v2/v3**. Build tetap mengaktifkan ketiga skema; validasi CI mewajibkan
-v2 dan hanya mewajibkan v1 jika `minSdk < 24`.
-
-### C. `jniLibs.useLegacyPackaging=false` dipaksa pada minSdk 21
-AGP menulis `android:extractNativeLibs="false"` yang tidak dikenal di Android 5/6.
-Override tersebut dihapus; AGP kembali memilih nilai yang sesuai minSdk.
-
-### D. Distribusi file rawan korup
-Artifact GitHub Actions berbentuk **ZIP**; di HP banyak pengguna tidak sengaja memasang
-file ZIP / file hasil ekstraksi yang salah. Sekarang setiap build menerbitkan file
-**`.apk` mentah** di halaman Release + `SHA256SUMS.txt`.
+> **Ronde 2 (v1.1.0):** perbaikan akar masalah Storage 403, sistem kode akses siswa
+> berbasis server, modul admin yang terhubung backend, serta desain ulang UI.
+> Detail perubahan, bukti validasi, dan daftar hal yang belum diuji:
+> [`docs/round2-edutask.md`](docs/round2-edutask.md).
+>
+> Aplikasi ini **bukan** aplikasi resmi sekolah. Status "resmi" pada tugas hanya
+> berarti laporan siswa sudah diverifikasi server melalui kode akses.
 
 ---
 
-## 2. Cara memasang yang benar
+## Fitur utama
 
-1. Buka **Releases** repo → tag **`latest-apk`**.
-2. Pilih satu file:
-   - `EduTask-<versi>-arm64-v8a.apk` → hampir semua HP Android modern (paling kecil).
-   - `EduTask-<versi>-armeabi-v7a.apk` → HP lama 32-bit.
-   - `EduTask-<versi>-universal.apk` → semua ABI dalam satu file (paling besar).
-3. Unduh **langsung ke HP** (jangan lewat WhatsApp/kompresi ulang).
-4. Buka dari notifikasi/File Manager → izinkan **Install unknown apps**.
-5. Jika muncul "aplikasi tidak terpasang"/"paket bentrok": **uninstall EduTask lama dulu**
-   (build lama ditandatangani kunci berbeda), lalu pasang lagi.
+| Peran | Kemampuan |
+|---|---|
+| **Admin** | Dashboard statistik, data guru (undang via Edge Function), data siswa (aktif/nonaktif), kelas, mata pelajaran, jadwal (anti-bentrok), tugas + lampiran, laporan penyelesaian, manajemen kode akses siswa, akun & role, audit log, pengaturan, tentang |
+| **Guru** | Jadwal mengajar, CRUD tugas + lampiran (milik sendiri), terbitkan/draft, arsipkan, status penyelesaian siswa, penerbitan kode akses untuk kelas yang diampu, profil |
+| **Siswa (tanpa login)** | Jadwal dan tugas per kelas, detail tugas + lampiran, verifikasi kode akses di halaman Identitas, status selesai tersimpan **lokal** atau **resmi (server)** |
 
-### Verifikasi checksum (opsional, di HP)
-Aplikasi seperti *Hash Droid* / Termux:
+- Material 3, tema biru, komponen bersama (`AppCard`, `AppHeroHeader`, `AppEmptyState`,
+  `AppErrorState`, `StatusChip`, dan lainnya).
+- Splash dengan pemeriksaan nyata (onboarding → sesi → role), onboarding 5 langkah yang
+  dapat dibuka ulang, halaman Tentang berisi tim & sekolah.
+- Login hanya memakai label "Email" dan "Kata Sandi" — tidak ada petunjuk kredensial,
+  akun contoh, atau akun admin hardcoded.
+
+## Stack
+
+- Flutter (Dart 3) · Riverpod · GoRouter
+- Supabase: Postgres + RLS, Auth, Storage, Edge Functions (Deno/TypeScript)
+- Android `minSdk 24`, `targetSdk 36`, `applicationId com.edutask.sekolah`
+- CI GitHub Actions: analyze + test, build APK release (universal & split-per-ABI),
+  validasi `aapt`/`apksigner`/`zipalign`, publikasi ke Release `latest-apk`
+
+## Menjalankan secara lokal
+
+```bash
+flutter pub get
+flutter run \
+  --dart-define=SUPABASE_URL=https://<project-ref>.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=<anon-key>
 ```
-sha256sum EduTask-1.0.0-arm64-v8a.apk
+
+Tanpa dua nilai di atas aplikasi berjalan dalam **mode terbatas** (banner peringatan,
+data kosong). Jangan pernah menaruh `service_role` di aplikasi Flutter.
+
+Analisis & uji:
+
+```bash
+flutter analyze
+flutter test
 ```
-Bandingkan dengan isi `SHA256SUMS.txt` di halaman Release. Jika berbeda → unduhan korup,
-unduh ulang.
 
----
+## Backend
 
-## 3. Jika masih gagal: cocokkan pesan dengan penyebab
+### Migrasi (jalankan berurutan di SQL Editor / `supabase db push`)
 
-| Pesan / gejala | Penyebab | Tindakan |
+| File | Isi |
+|---|---|
+| `supabase/migrations/001_initial_schema.sql` | Tabel inti: profiles, kelas, siswa, mata_pelajaran, guru_mapel, jadwal_pelajaran, tugas, status_tugas_siswa |
+| `supabase/migrations/002_security_hardening.sql` | Grant kolom terbatas, policy RLS diperketat, helper `is_admin()`/`is_guru()` |
+| `supabase/migrations/003_storage_attachments.sql` | Bucket **privat** `lampiran-tugas`, policy Storage lengkap, path `tugas/<guru_id>/<tugas_id>/<file>` |
+| `supabase/migrations/004_access_codes_audit.sql` | `kode_akses_siswa`, `siswa_akun`, `kode_akses_attempt`, `audit_log` + trigger, RPC `claim_kode_akses` |
+
+### Edge Functions
+
+| Function | JWT | Kegunaan |
 |---|---|---|
-| "Ada masalah saat mengurai paket" saat file dibuka | File bukan APK (ZIP/rusak) | Unduh `.apk` dari Release, cek SHA-256 |
-| "App not installed" / "paket bentrok" setelah memilih Install | Signature berbeda dari app yang sudah terpasang | Uninstall app lama, pasang ulang |
-| "Aplikasi tidak mendukung perangkat ini" | ABI tidak cocok (mis. memasang arm64 di HP 32-bit) | Pakai `armeabi-v7a` atau `universal` |
-| "Your device is not compatible" / "Ada masalah saat mengurai paket" | Android 5–6 (API 21–23) | **Tidak didukung** — aplikasi butuh Android 7.0+ (Flutter 3.35) |
-| Berhasil install tapi langsung tertutup | Crash runtime | Kirim `adb logcat -d \| grep -A30 "FATAL EXCEPTION"` |
+| `create-teacher` | ya | Undang akun guru (hanya admin) |
+| `student-access` | tidak | Verifikasi kode akses siswa, rate limit, klaim atomik |
+| `student-codes` | ya | Terbitkan/cabut kode akses (admin/guru) |
+| `update-student-task-status` | tidak | Tandai tugas selesai dengan token siswa (HMAC) |
 
----
+```bash
+supabase functions deploy create-teacher
+supabase functions deploy student-access
+supabase functions deploy student-codes
+supabase functions deploy update-student-task-status
+```
 
-## 4. Bukti validasi di CI (setiap build)
+Urutan aman: **deploy function → jalankan 003 → jalankan 004**.
 
-Workflow **Build EduTask APK** menjalankan, untuk setiap APK:
+## Build APK
 
-- `unzip -t` → integritas ZIP/APK
-- `aapt dump badging` → package `com.edutask.sekolah`, `sdkVersion` (24), `targetSdkVersion`, `native-code`
-- `apksigner verify --verbose --print-certs` → memastikan **v1/v2/v3 valid** (build gagal kalau tidak)
-- `zipalign -c -v 4` → alignment
-- `sha256sum` → checksum yang dipublikasikan
+Workflow `Build EduTask APK` menghasilkan APK universal + split-per-ABI, menandatangani
+ulang secara deterministik, lalu memvalidasi paket. Rilis terbaru:
+`https://github.com/HOOOOOOQ/aplikasioo/releases/tag/latest-apk`.
 
-Job **install-test** kemudian:
-1. Menjalankan emulator Android API 30 (x86_64)
-2. `adb install -r` APK universal
-3. `am start -W` → harus `Status: ok`
-4. Menunggu 15 detik, memeriksa `FATAL EXCEPTION` di logcat
-5. Relaunch lewat `monkey` untuk memastikan cold start kedua juga sehat
+Jika APK gagal dipasang di perangkat, ikuti
+[`docs/apk-install-troubleshooting.md`](docs/apk-install-troubleshooting.md).
 
----
+## Struktur proyek
 
-## 5. Mengganti keystore untuk produksi
+```
+lib/
+  core/        konfigurasi, tema, routing, widget bersama, util
+  features/    auth, admin, teacher, student, access_codes, onboarding, about
+  shared/      model, repository, service Supabase
+supabase/
+  migrations/  skema + policy + trigger
+  functions/   Edge Functions (Deno)
+test/          unit test murni (tanpa jaringan)
+docs/          laporan ronde 2 & panduan instalasi APK
+```
 
-Keystore yang di-commit adalah **kunci test** (bukan Play Store). Untuk memakai kunci
-pribadi tanpa mengubah kode:
+## Tim
 
-1. Buat keystore lokal:
-   ```bash
-   keytool -genkey -v -keystore upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
-   ```
-2. Base64-kan: `base64 -w0 upload.jks`
-3. GitHub → Settings → Secrets → Actions:
-   - `ANDROID_KEYSTORE_BASE64`
-   - `ANDROID_KEYSTORE_PASSWORD`
-   - `ANDROID_KEY_ALIAS`
-   - `ANDROID_KEY_PASSWORD`
-4. Jalankan ulang workflow. Build akan memakai keystore Anda.
+Dikembangkan oleh **Noval Rizki** (Developer), **Rohiman** (Partner), dan
+**Fikri Muhammad Faiz** (Penyedia) — *From 3 Person To All*.
+SMK Al Madani Garut · PPLG — Pengembangan Perangkat Lunak dan Gim.
 
-> Setelah mengganti kunci, pengguna **harus uninstall sekali** karena signature berubah.
+© 2026 PALL. All rights reserved.

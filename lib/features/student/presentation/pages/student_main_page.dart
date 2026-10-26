@@ -1,42 +1,49 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
+
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/date_utils.dart';
 import '../../../../core/utils/deadline_helper.dart';
 import '../../../../core/widgets/app_banner.dart';
-import '../../../../core/widgets/empty_state.dart';
-import '../../../../core/widgets/loading_view.dart';
+import '../../../../core/widgets/app_card.dart';
+import '../../../../core/widgets/app_header.dart';
+import '../../../../core/widgets/app_states.dart';
 import '../../../../core/widgets/status_chip.dart';
-import '../../../../shared/models/kelas.dart';
 import '../../../../shared/models/jadwal.dart';
+import '../../../../shared/models/kelas.dart';
 import '../../../../shared/models/tugas.dart';
-import '../../../../shared/repositories/kelas_repository.dart';
 import '../../../../shared/repositories/jadwal_repository.dart';
+import '../../../../shared/repositories/kelas_repository.dart';
 import '../../../../shared/repositories/tugas_repository.dart';
 import '../../identity/student_identity_provider.dart';
 
-final kelasListProvider = FutureProvider<List<Kelas>>((ref) async {
-  if (SupabaseConfig.isNotConfigured) return [];
+final kelasListProvider = FutureProvider.autoDispose<List<Kelas>>((ref) async {
+  if (SupabaseConfig.isNotConfigured) return const [];
   return KelasRepository().fetchAll();
 });
 
-final studentJadwalProvider = FutureProvider.family<List<Jadwal>, String>((ref, kelasId) async {
-  if (SupabaseConfig.isNotConfigured) return [];
-  if (kelasId.isEmpty) return [];
-  final hari = AppDateUtils.hariIndonesia(AppDateUtils.nowJakarta());
-  // ambil semua jadwal kelas, filter hari ini di UI juga tampil semua
+final studentScheduleProvider = FutureProvider.autoDispose.family<List<Jadwal>, String>((ref, kelasId) async {
+  if (SupabaseConfig.isNotConfigured || kelasId.isEmpty) return const [];
   return JadwalRepository().fetchByKelas(kelasId);
 });
 
-final studentTugasProvider = FutureProvider.family<List<Tugas>, String>((ref, kelasId) async {
-  if (SupabaseConfig.isNotConfigured) return [];
-  if (kelasId.isEmpty) return [];
+final studentTasksProvider = FutureProvider.autoDispose.family<List<Tugas>, String>((ref, kelasId) async {
+  if (SupabaseConfig.isNotConfigured || kelasId.isEmpty) return const [];
   final identity = ref.watch(studentIdentityProvider);
   return TugasRepository().fetchAll(kelasId: kelasId, siswaId: identity.siswaId);
 });
+
+/// Kelas yang sedang dilihat siswa. Identitas terverifikasi menang; jika belum,
+/// siswa boleh memilih kelas secara manual (tanpa login).
+String? effectiveKelasId(WidgetRef ref, List<Kelas> kelasList) {
+  final identity = ref.watch(studentIdentityProvider);
+  final selected = identity.kelasId;
+  if (selected != null && kelasList.any((k) => k.id == selected)) return selected;
+  if (kelasList.isEmpty) return null;
+  return kelasList.first.id;
+}
 
 class StudentMainPage extends ConsumerStatefulWidget {
   const StudentMainPage({super.key});
@@ -46,416 +53,472 @@ class StudentMainPage extends ConsumerStatefulWidget {
 }
 
 class _StudentMainPageState extends ConsumerState<StudentMainPage> {
-  int _navIndex = 0;
-  String? _selectedKelasId;
-  String? _selectedKelasNama;
+  final ScrollController _scroll = ScrollController();
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final identity = ref.read(studentIdentityProvider);
-      if (identity.kelasId != null) {
-        setState(() {
-          _selectedKelasId = identity.kelasId;
-          _selectedKelasNama = identity.kelasNama;
-        });
-      }
-    });
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  Future<void> _refresh() async {
+    ref.invalidate(kelasListProvider);
+    ref.invalidate(studentScheduleProvider);
+    ref.invalidate(studentTasksProvider);
+    await ref.read(kelasListProvider.future);
   }
 
   @override
   Widget build(BuildContext context) {
-    final kelasAsync = ref.watch(kelasListProvider);
     final identity = ref.watch(studentIdentityProvider);
+    final kelasAsync = ref.watch(kelasListProvider);
+    final now = AppDateUtils.nowJakarta();
+    final hariIni = AppDateUtils.hariIndonesia(now);
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        title: const EduTaskHeaderBanner(isAppBar: true),
+        title: const Row(
+          children: [
+            EduTaskLogo(size: 30, withShadow: false),
+            SizedBox(width: AppSpacing.sm),
+            Text('EduTask'),
+          ],
+        ),
         actions: [
-          IconButton(icon: const Icon(Icons.person_outline, color: Colors.white), onPressed: () => context.push('/siswa/identitas')),
-          IconButton(icon: const Icon(Icons.login, color: Colors.white), onPressed: () => context.push('/login')),
+          IconButton(
+            tooltip: 'Identitas siswa',
+            onPressed: () => context.push('/siswa/identitas'),
+            icon: Badge(
+              isLabelVisible: identity.isIdentified,
+              backgroundColor: AppColors.success,
+              smallSize: 8,
+              child: const Icon(Icons.badge_outlined),
+            ),
+          ),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'about') context.push('/siswa/tentang');
+              if (value == 'login') context.push('/login');
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 'about', child: Text('Tentang EduTask')),
+              PopupMenuItem(value: 'login', child: Text('Masuk sebagai guru/admin')),
+            ],
+          ),
         ],
       ),
-      body: kelasAsync.when(
-        loading: () => const LoadingView(message: 'Memuat data kelas...'),
-        error: (e, _) => ErrorState(message: e.toString(), onRetry: () => ref.refresh(kelasListProvider)),
-        data: (kelasList) {
-          if (SupabaseConfig.isNotConfigured) {
-            return _buildNotConfigured();
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: 0,
+        onDestinationSelected: (index) {
+          switch (index) {
+            case 1:
+              context.go('/siswa/jadwal');
+              break;
+            case 2:
+              context.go('/siswa/tugas');
+              break;
+            case 3:
+              context.push('/siswa/identitas');
+              break;
           }
-          if (kelasList.isEmpty) {
-            return const EmptyState(icon: Icons.class_outlined, title: 'Belum Ada Kelas', subtitle: 'Admin belum menambahkan data kelas. Hubungi admin sekolah.');
-          }
-          // FIX: jangan panggil addPostFrameCallback di dalam build (penempatan script salah → infinite loop → FC)
-          // Gunakan computed value tanpa setState. Efek samping di-build dilarang.
-          final effectiveKelasId = _selectedKelasId ?? kelasList.first.id;
-          final effectiveKelasNama = _selectedKelasNama ?? kelasList.first.namaKelas;
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Banner EduTask — selalu tampil agar branding jelas
-                const EduTaskBanner(height: 42),
-                const SizedBox(height: 12),
-                // Tanggal hari ini
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(gradient: AppColors.headerGradient, borderRadius: BorderRadius.circular(16)),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(AppDateUtils.hariIndonesia(AppDateUtils.nowJakarta()), style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
-                            Text(DateFormat('dd MMMM yyyy', 'id_ID').format(AppDateUtils.nowJakarta()), style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                            const SizedBox(height: 8),
-                            if (identity.isIdentified)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
-                                child: Text('Halo, ${identity.siswaNama}', style: const TextStyle(color: Colors.white, fontSize: 12)),
-                              )
-                            else
-                              GestureDetector(
-                                onTap: () => context.push('/siswa/identitas'),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-                                  child: const Text('Verifikasi identitas untuk laporan resmi', style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600)),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
-                        child: const Icon(Icons.calendar_today, color: Colors.white),
-                      ),
-                    ],
+        },
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'Beranda'),
+          NavigationDestination(icon: Icon(Icons.calendar_month_outlined), selectedIcon: Icon(Icons.calendar_month_rounded), label: 'Jadwal'),
+          NavigationDestination(icon: Icon(Icons.assignment_outlined), selectedIcon: Icon(Icons.assignment_rounded), label: 'Tugas'),
+          NavigationDestination(icon: Icon(Icons.badge_outlined), selectedIcon: Icon(Icons.badge_rounded), label: 'Identitas'),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: kelasAsync.when(
+          loading: () => ListView(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            children: const [SizedBox(height: AppSpacing.xl), AppSkeletonList(count: 3)],
+          ),
+          error: (e, _) => ListView(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            children: [
+              const SizedBox(height: AppSpacing.xl),
+              AppErrorState(error: e, onRetry: _refresh),
+            ],
+          ),
+          data: (kelasList) {
+            if (kelasList.isEmpty) {
+              return ListView(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                children: [
+                  const SizedBox(height: AppSpacing.xl),
+                  AppHeroHeader(
+                    eyebrow: '$hariIni, ${AppDateUtils.formatTanggal(now)}',
+                    title: 'Selamat datang',
+                    subtitle: 'Belum ada data kelas dari sekolah.',
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.lg),
+                  AppCard(
+                    child: AppEmptyState(
+                      icon: Icons.class_outlined,
+                      title: 'Belum ada kelas',
+                      subtitle: SupabaseConfig.isNotConfigured
+                          ? 'Build ini belum terhubung ke Supabase. Hubungi pengelola aplikasi.'
+                          : 'Admin sekolah belum menambahkan kelas. Coba muat ulang sebentar lagi.',
+                      actionLabel: 'Muat ulang',
+                      onAction: _refresh,
+                    ),
+                  ),
+                ],
+              );
+            }
 
-                // Pilih kelas
+            final kelasId = effectiveKelasId(ref, kelasList);
+            final kelasAktif = kelasList.firstWhere((k) => k.id == kelasId, orElse: () => kelasList.first);
+            final jadwalAsync = ref.watch(studentScheduleProvider(kelasId ?? ''));
+            final tugasAsync = ref.watch(studentTasksProvider(kelasId ?? ''));
+
+            return ListView(
+              controller: _scroll,
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.xxl),
+              children: [
+                AppHeroHeader(
+                  eyebrow: '$hariIni, ${AppDateUtils.formatTanggal(now)}',
+                  title: identity.isIdentified
+                      ? 'Halo, ${identity.siswaNama ?? 'Siswa'}'
+                      : 'Halo, Sobat EduTask',
+                  subtitle: identity.isIdentified
+                      ? '${identity.kelasNama ?? kelasAktif.namaKelas} • Identitas terverifikasi'
+                      : 'Pilih kelas untuk melihat jadwal dan tugas tanpa login.',
+                  trailing: identity.isIdentified
+                      ? const Icon(Icons.verified_rounded, color: Colors.white)
+                      : null,
+                  footer: _IdentityStrip(identity: identity),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                _KelasSelector(
+                  kelasList: kelasList,
+                  selectedId: kelasAktif.id,
+                  onSelected: (kelas) async {
+                    await ref.read(studentIdentityProvider.notifier).setKelas(
+                          kelas.id,
+                          kelasNama: kelas.namaKelas,
+                        );
+                  },
+                ),
+                const SizedBox(height: AppSpacing.lg),
                 Row(
                   children: [
-                    const Text('Pilih Kelas:', style: TextStyle(fontWeight: FontWeight.w600)),
-                    const SizedBox(width: 8),
                     Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: effectiveKelasId,
-                        decoration: InputDecoration(contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-                        items: kelasList.map((k) => DropdownMenuItem(value: k.id, child: Text(k.namaKelas, style: const TextStyle(fontSize: 13)))).toList(),
-                        onChanged: (v) {
-                          final k = kelasList.firstWhere((e) => e.id == v, orElse: () => kelasList.first);
-                          setState(() {
-                            _selectedKelasId = v;
-                            _selectedKelasNama = k.namaKelas;
-                          });
-                          ref.read(studentIdentityProvider.notifier).setKelas(k.id, kelasNama: k.namaKelas);
+                      child: jadwalAsync.when(
+                        loading: () => const MetricTile(
+                          label: 'Jadwal hari ini',
+                          value: '…',
+                          icon: Icons.schedule_rounded,
+                        ),
+                        error: (_, __) => MetricTile(
+                          label: 'Jadwal hari ini',
+                          value: '-',
+                          icon: Icons.schedule_rounded,
+                          caption: 'Gagal dimuat',
+                          onTap: () => context.go('/siswa/jadwal'),
+                        ),
+                        data: (list) {
+                          final today = list.where((j) => j.hari == hariIni).length;
+                          return MetricTile(
+                            label: 'Jadwal hari ini',
+                            value: '$today',
+                            icon: Icons.schedule_rounded,
+                            caption: today == 0 ? 'Tidak ada pelajaran' : 'Pelajaran',
+                            onTap: () => context.go('/siswa/jadwal'),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: tugasAsync.when(
+                        loading: () => const MetricTile(
+                          label: 'Tugas aktif',
+                          value: '…',
+                          icon: Icons.assignment_rounded,
+                          color: AppColors.warning,
+                          background: AppColors.warningContainer,
+                        ),
+                        error: (_, __) => const MetricTile(
+                          label: 'Tugas aktif',
+                          value: '-',
+                          icon: Icons.assignment_rounded,
+                          color: AppColors.warning,
+                          background: AppColors.warningContainer,
+                          caption: 'Gagal dimuat',
+                        ),
+                        data: (list) {
+                          final localStatus = ref.watch(localTaskStatusProvider);
+                          final aktif = list.where((t) {
+                            final done = t.statusSiswa == 'selesai' || localStatus[t.id] == 'selesai';
+                            return !done;
+                          }).length;
+                          return MetricTile(
+                            label: 'Tugas belum selesai',
+                            value: '$aktif',
+                            icon: Icons.assignment_late_rounded,
+                            color: AppColors.warning,
+                            background: AppColors.warningContainer,
+                            caption: 'Dari ${list.length} tugas',
+                            onTap: () => context.go('/siswa/tugas'),
+                          );
                         },
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-
-                _buildJadwalHariIni(effectiveKelasId),
-                const SizedBox(height: 16),
-                _buildTugasTerbaru(effectiveKelasId),
-              ],
-            ),
-          );
-        },
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _navIndex,
-        onDestinationSelected: (i) {
-          setState(() => _navIndex = i);
-          switch (i) {
-            case 0:
-              break;
-            case 1:
-              context.push('/siswa/jadwal');
-              break;
-            case 2:
-              context.push('/siswa/tugas');
-              break;
-            case 3:
-              context.push('/siswa/tentang');
-              break;
-          }
-        },
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Beranda'),
-          NavigationDestination(icon: Icon(Icons.calendar_month_outlined), selectedIcon: Icon(Icons.calendar_month), label: 'Jadwal'),
-          NavigationDestination(icon: Icon(Icons.assignment_outlined), selectedIcon: Icon(Icons.assignment), label: 'Tugas'),
-          NavigationDestination(icon: Icon(Icons.info_outline), selectedIcon: Icon(Icons.info), label: 'Tentang'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNotConfigured() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          const EduTaskBanner(height: 44),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: AppColors.warningContainer, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.warning)),
-            child: const Column(
-              children: [
-                Icon(Icons.warning_amber_rounded, size: 40, color: AppColors.warning),
-                SizedBox(height: 8),
-                Text('Supabase Belum Dikonfigurasi', style: TextStyle(fontWeight: FontWeight.w600)),
-                SizedBox(height: 8),
-                Text(
-                  'Aplikasi belum terhubung ke database online. Admin perlu mengatur SUPABASE_URL dan SUPABASE_ANON_KEY melalui --dart-define.\n\nLihat README.md untuk panduan. Kamu tetap bisa lihat preview fitur di bawah.',
-                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                  textAlign: TextAlign.center,
+                const SizedBox(height: AppSpacing.xl),
+                SectionHeader(
+                  title: 'Jadwal hari ini',
+                  subtitle: hariIni,
+                  actionLabel: 'Semua',
+                  onAction: () => context.go('/siswa/jadwal'),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Preview Fitur Siswa (Mode Offline Demo)', style: TextStyle(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 12),
-                  _demoItem('Jadwal Hari Ini', 'Senin — Matematika 07:30-08:30, Bahasa Indonesia 08:30-09:30', Icons.schedule),
-                  _demoItem('Tugas Terbaru', 'Tugas Matematika: Latihan Bab 1 — Tenggat 2 hari lagi', Icons.assignment),
-                  _demoItem('Status', 'Mendekati tenggat akan berwarna oranye, terlambat merah, selesai hijau', Icons.info_outline),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _demoItem(String t, String s, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: AppColors.primaryContainer, borderRadius: BorderRadius.circular(8)), child: Icon(icon, size: 16, color: AppColors.primary)),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(t, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)), Text(s, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))])),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildJadwalHariIni(String kelasId) {
-    final asyncJadwal = ref.watch(studentJadwalProvider(kelasId));
-    return asyncJadwal.when(
-      loading: () => const Card(child: Padding(padding: EdgeInsets.all(16), child: LinearProgressIndicator())),
-      error: (e, _) => Card(child: Padding(padding: EdgeInsets.all(16), child: Text('Gagal memuat jadwal: $e'))),
-      data: (list) {
-        final hariIni = AppDateUtils.hariIndonesia(AppDateUtils.nowJakarta());
-        final todayList = list.where((j) => j.hari == hariIni).toList();
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.schedule, size: 18, color: AppColors.primary),
-                    const SizedBox(width: 8),
-                    Text('Jadwal Hari Ini — $hariIni', style: const TextStyle(fontWeight: FontWeight.w600)),
-                    const Spacer(),
-                    TextButton(onPressed: () => context.push('/siswa/jadwal'), child: const Text('Lihat Semua')),
-                  ],
-                ),
-                const Divider(),
-                if (todayList.isEmpty)
-                  const Padding(padding: EdgeInsets.all(12), child: Text('Tidak ada jadwal untuk hari ini.', style: TextStyle(color: AppColors.textSecondary))),
-                for (final j in todayList)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: BorderRadius.circular(12)),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                          decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(8)),
-                          child: Text('${AppDateUtils.formatJamFromString(j.jamMulai)}\n${AppDateUtils.formatJamFromString(j.jamSelesai)}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600), textAlign: TextAlign.center),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(j.mataPelajaranNama ?? '-', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                              Text('${j.guruNama ?? "-"} • ${j.ruang ?? "-"}', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                            ],
-                          ),
-                        ),
-                      ],
+                jadwalAsync.when(
+                  loading: () => const AppSkeletonList(count: 2),
+                  error: (e, _) => AppCard(
+                    child: AppEmptyState(
+                      icon: Icons.wifi_off_rounded,
+                      title: 'Jadwal gagal dimuat',
+                      subtitle: 'Periksa koneksi lalu coba lagi.',
+                      actionLabel: 'Coba lagi',
+                      onAction: () => ref.invalidate(studentScheduleProvider(kelasAktif.id)),
                     ),
                   ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildTugasTerbaru(String kelasId) {
-    final asyncTugas = ref.watch(studentTugasProvider(kelasId));
-    return asyncTugas.when(
-      loading: () => const Card(child: Padding(padding: EdgeInsets.all(16), child: LinearProgressIndicator())),
-      error: (e, _) => Card(child: Padding(padding: EdgeInsets.all(16), child: Text('Gagal memuat tugas: $e'))),
-      data: (list) {
-        if (list.isEmpty) {
-          return Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  const Text('Tugas Terbaru', style: TextStyle(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  const EmptyState(icon: Icons.assignment_outlined, title: 'Belum Ada Tugas', subtitle: 'Guru belum memberikan tugas untuk kelas ini.'),
-                ],
-              ),
-            ),
-          );
-        }
-        // Categorize
-        final identity = ref.read(studentIdentityProvider);
-        final localStatuses = ref.watch(localTaskStatusProvider);
-        List<Tugas> withStatus(String filter) {
-          return list.where((t) {
-            final isCompleted = identity.isIdentified ? t.isCompleted : (localStatuses[t.id] == 'selesai');
-            final status = DeadlineHelper.getStatus(deadline: t.tenggatWaktu, isCompleted: isCompleted);
-            if (filter == 'terlambat') return status == DeadlineStatus.terlambat;
-            if (filter == 'mendekati') return status == DeadlineStatus.mendekatiTenggat;
-            return true;
-          }).toList();
-        }
-
-        final terlambat = withStatus('terlambat');
-        final mendekati = withStatus('mendekati');
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (terlambat.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(color: AppColors.errorContainer, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.error)),
-                child: Row(
-                  children: [
-                    const Icon(Icons.error, color: AppColors.error),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text('${terlambat.length} tugas terlambat — segera selesaikan!', style: const TextStyle(color: AppColors.error, fontWeight: FontWeight.w600, fontSize: 12))),
-                    TextButton(onPressed: () => context.push('/siswa/tugas'), child: const Text('Lihat')),
-                  ],
+                  data: (list) {
+                    final today = list.where((j) => j.hari == hariIni).toList();
+                    if (today.isEmpty) {
+                      return const AppCard(
+                        child: AppEmptyState(
+                          icon: Icons.free_breakfast_rounded,
+                          title: 'Tidak ada jadwal hari ini',
+                          subtitle: 'Gunakan waktu untuk mengerjakan tugas yang belum selesai.',
+                        ),
+                      );
+                    }
+                    return Column(
+                      children: today
+                          .take(3)
+                          .map((jadwal) => Padding(
+                                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                                child: _JadwalTile(jadwal: jadwal),
+                              ))
+                          .toList(),
+                    );
+                  },
                 ),
-              ),
-            if (mendekati.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(color: AppColors.warningContainer, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.warning)),
-                child: Row(
-                  children: [
-                    const Icon(Icons.warning_amber_rounded, color: AppColors.warning),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text('${mendekati.length} tugas mendekati tenggat (24 jam)', style: const TextStyle(color: AppColors.warningDark, fontWeight: FontWeight.w600, fontSize: 12))),
-                  ],
+                const SizedBox(height: AppSpacing.xl),
+                SectionHeader(
+                  title: 'Tugas terdekat',
+                  subtitle: 'Diurutkan dari tenggat paling awal',
+                  actionLabel: 'Semua',
+                  onAction: () => context.go('/siswa/tugas'),
                 ),
-              ),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Text('Tugas Terbaru', style: TextStyle(fontWeight: FontWeight.w600)),
-                        const Spacer(),
-                        TextButton(onPressed: () => context.push('/siswa/tugas'), child: const Text('Lihat Semua')),
-                      ],
+                tugasAsync.when(
+                  loading: () => const AppSkeletonList(count: 2),
+                  error: (e, _) => AppCard(
+                    child: AppEmptyState(
+                      icon: Icons.wifi_off_rounded,
+                      title: 'Tugas gagal dimuat',
+                      subtitle: 'Periksa koneksi lalu coba lagi.',
+                      actionLabel: 'Coba lagi',
+                      onAction: () => ref.invalidate(studentTasksProvider(kelasAktif.id)),
                     ),
-                    const Divider(),
-                    for (final t in list.take(5))
-                      _TugasCardCompact(tugas: t, onTap: () => context.push('/siswa/tugas/${t.id}')),
+                  ),
+                  data: (list) {
+                    if (list.isEmpty) {
+                      return const AppCard(
+                        child: AppEmptyState(
+                          icon: Icons.task_alt_rounded,
+                          title: 'Belum ada tugas',
+                          subtitle: 'Guru belum menerbitkan tugas untuk kelas ini.',
+                        ),
+                      );
+                    }
+                    final localStatus = ref.watch(localTaskStatusProvider);
+                    return Column(
+                      children: list
+                          .take(3)
+                          .map((tugas) {
+                            final official = tugas.statusSiswa == 'selesai';
+                            final local = localStatus[tugas.id] == 'selesai';
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                              child: AppCard(
+                                padding: const EdgeInsets.all(AppSpacing.md),
+                                onTap: () => context.push('/siswa/tugas/${tugas.id}'),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            tugas.judul,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                                          ),
+                                        ),
+                                        StatusChip(
+                                          status: DeadlineHelper.getStatus(
+                                            deadline: tugas.tenggatWaktu,
+                                            isCompleted: official || local,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${tugas.mataPelajaranNama ?? '-'} • '
+                                      '${AppDateUtils.formatTanggal(tugas.tenggatWaktu)}',
+                                      style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          })
+                          .toList(),
+                    );
+                  },
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                const SectionHeader(title: 'Pintasan', icon: Icons.bolt_rounded),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () => context.push('/siswa/identitas'),
+                      icon: const Icon(Icons.badge_outlined, size: 18),
+                      label: Text(identity.isIdentified ? 'Identitas saya' : 'Verifikasi kode akses'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => context.push('/siswa/tentang'),
+                      icon: const Icon(Icons.info_outline_rounded, size: 18),
+                      label: const Text('Tentang EduTask'),
+                    ),
                   ],
                 ),
-              ),
-            ),
-          ],
-        );
-      },
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 }
 
-class _TugasCardCompact extends ConsumerWidget {
-  final Tugas tugas;
-  final VoidCallback onTap;
-  const _TugasCardCompact({required this.tugas, required this.onTap});
+class _IdentityStrip extends StatelessWidget {
+  final StudentIdentity identity;
+  const _IdentityStrip({required this.identity});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final identity = ref.watch(studentIdentityProvider);
-    final localStatuses = ref.watch(localTaskStatusProvider);
-    final isCompleted = identity.isIdentified ? tugas.isCompleted : (localStatuses[tugas.id] == 'selesai');
-    final status = DeadlineHelper.getStatus(deadline: tugas.tenggatWaktu, isCompleted: isCompleted);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(border: Border.all(color: AppColors.border), borderRadius: BorderRadius.circular(12)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            identity.isIdentified ? Icons.verified_rounded : Icons.info_outline_rounded,
+            size: 15,
+            color: Colors.white,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              identity.isIdentified
+                  ? 'Status tugas yang Anda laporkan tercatat resmi di server.'
+                  : 'Belum terverifikasi — perubahan status tugas hanya tersimpan di perangkat ini.',
+              style: TextStyle(fontSize: 10.5, height: 1.35, color: Colors.white.withValues(alpha: 0.92)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _KelasSelector extends StatelessWidget {
+  final List<Kelas> kelasList;
+  final String selectedId;
+  final ValueChanged<Kelas> onSelected;
+  const _KelasSelector({required this.kelasList, required this.selectedId, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: kelasList
+            .map((kelas) => Padding(
+                  padding: const EdgeInsets.only(right: AppSpacing.sm),
+                  child: ChoiceChip(
+                    label: Text(kelas.namaKelas),
+                    selected: kelas.id == selectedId,
+                    onSelected: (_) => onSelected(kelas),
+                  ),
+                ))
+            .toList(),
+      ),
+    );
+  }
+}
+
+class _JadwalTile extends StatelessWidget {
+  final Jadwal jadwal;
+  const _JadwalTile({required this.jadwal});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.primaryContainer,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+            ),
+            child: Column(
               children: [
-                Expanded(child: Text(tugas.judul, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
-                StatusChip(status: status),
+                Text(
+                  AppDateUtils.formatJamFromString(jadwal.jamMulai),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.primaryDark),
+                ),
+                Text(
+                  AppDateUtils.formatJamFromString(jadwal.jamSelesai),
+                  style: const TextStyle(fontSize: 9.5, color: AppColors.primaryDark),
+                ),
               ],
             ),
-            const SizedBox(height: 4),
-            Text('${tugas.mataPelajaranNama ?? "-"} • ${tugas.guruNama ?? "-"}', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-            const SizedBox(height: 4),
-            Row(
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.event, size: 12, color: AppColors.textTertiary),
-                const SizedBox(width: 4),
-                Text('Tenggat: ${AppDateUtils.formatTanggalJam(tugas.tenggatWaktu)}', style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
-                const Spacer(),
-                Text(AppDateUtils.relativeDeadline(tugas.tenggatWaktu), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: DeadlineHelper.colorForStatus(status))),
+                Text(jadwal.mataPelajaranNama ?? '-',
+                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+                Text(
+                  '${jadwal.guruNama ?? '-'}${jadwal.ruang != null && jadwal.ruang!.isNotEmpty ? ' • ${jadwal.ruang}' : ''}',
+                  style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

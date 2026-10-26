@@ -16,3 +16,8 @@ verify_jwt = false
 
 [functions.update-student-task-status]
 verify_jwt = false
+
+# Penerbitan/pencabutan kode akses siswa: hanya admin/guru login.
+# JWT diverifikasi gateway DAN dicek ulang terhadap profiles di dalam function.
+[functions.student-codes]
+verify_jwt = true

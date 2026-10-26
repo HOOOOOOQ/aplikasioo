@@ -14,7 +14,7 @@ class EduTaskLogo extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(size * 0.22),
-        boxShadow: withShadow ? [BoxShadow(color: AppColors.primary.withOpacity(0.25), blurRadius: 12, offset: const Offset(0, 6))] : null,
+        boxShadow: withShadow ? [BoxShadow(color: AppColors.primary.withValues(alpha: 0.25), blurRadius: 12, offset: const Offset(0, 6))] : null,
       ),
       clipBehavior: Clip.antiAlias,
       child: Image.asset(
@@ -51,7 +51,7 @@ class EduTaskBanner extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text('EduTask', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-              Text('Tugas & Jadwal Sekolah', style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.85))),
+              Text('Tugas & Jadwal Sekolah', style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.85))),
             ],
           ),
         ],
@@ -107,7 +107,7 @@ class EduTaskHeaderBanner extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(10),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 6, offset: const Offset(0, 2))],
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 6, offset: const Offset(0, 2))],
             ),
             clipBehavior: Clip.antiAlias,
             child: Image.asset(
@@ -123,23 +123,10 @@ class EduTaskHeaderBanner extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text('EduTask', style: TextStyle(fontSize: isAppBar ? 16 : 18, fontWeight: FontWeight.bold, color: Colors.white)),
-                Text('Tugas & Jadwal Sekolah', style: TextStyle(fontSize: isAppBar ? 11 : 12, color: Colors.white.withOpacity(0.9))),
+                Text('Tugas & Jadwal Sekolah', style: TextStyle(fontSize: isAppBar ? 11 : 12, color: Colors.white.withValues(alpha: 0.9))),
               ],
             ),
           ),
-          if (!isAppBar)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.verified, size: 12, color: Colors.white),
-                  SizedBox(width: 4),
-                  Text('Resmi', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ),
         ],
       ),
     );

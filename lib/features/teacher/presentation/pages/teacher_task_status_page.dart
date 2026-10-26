@@ -1,110 +1,182 @@
 import 'package:flutter/material.dart';
-import '../../../../core/constants/app_colors.dart';
-import '../../../../core/widgets/loading_view.dart';
-import '../../../../core/widgets/empty_state.dart';
-import '../../../../shared/repositories/tugas_repository.dart';
-import '../../../../shared/models/status_tugas.dart';
-import '../../../../core/config/supabase_config.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class TeacherTaskStatusPage extends StatefulWidget {
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/utils/date_utils.dart';
+import '../../../../core/widgets/app_card.dart';
+import '../../../../core/widgets/app_header.dart';
+import '../../../../core/widgets/app_states.dart';
+import '../../../../shared/models/status_tugas.dart';
+import '../../../../shared/repositories/tugas_repository.dart';
+
+final taskStatusProvider = FutureProvider.autoDispose.family<({List<StatusTugasSiswa> rows, Map<String, int> summary}), String>((ref, tugasId) async {
+  final repo = TugasRepository();
+  final results = await Future.wait([
+    repo.fetchStatusForTugas(tugasId),
+    repo.fetchSummary(tugasId),
+  ]);
+  return (
+    rows: results[0] as List<StatusTugasSiswa>,
+    summary: results[1] as Map<String, int>,
+  );
+});
+
+class TeacherTaskStatusPage extends ConsumerStatefulWidget {
   final String taskId;
   const TeacherTaskStatusPage({super.key, required this.taskId});
 
   @override
-  State<TeacherTaskStatusPage> createState() => _TeacherTaskStatusPageState();
+  ConsumerState<TeacherTaskStatusPage> createState() => _TeacherTaskStatusPageState();
 }
 
-class _TeacherTaskStatusPageState extends State<TeacherTaskStatusPage> {
-  List<StatusTugasSiswa> _list = [];
-  Map<String, int> _summary = {};
-  bool _loading = true;
-  String _filter = 'Semua';
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    if (SupabaseConfig.isNotConfigured) {
-      if (!mounted) return;
-      setState(() => _loading = false);
-      return;
-    }
-    if (!mounted) return;
-    setState(() => _loading = true);
-    try {
-      final s = await TugasRepository().fetchStatusForTugas(widget.taskId);
-      final sum = await TugasRepository().fetchSummary(widget.taskId);
-      if (!mounted) return;
-      setState(() { _list = s; _summary = sum; _loading = false; });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _loading = false);
-    }
-  }
+class _TeacherTaskStatusPageState extends ConsumerState<TeacherTaskStatusPage> {
+  String _filter = 'semua';
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filter == 'Semua' ? _list : _list.where((e) => e.status == (_filter == 'Selesai' ? 'selesai' : 'belum_selesai')).toList();
+    final async = ref.watch(taskStatusProvider(widget.taskId));
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Status Penyelesaian'), backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-      body: _loading
-          ? const LoadingView()
-          : Column(
-              children: [
-                Card(
-                  margin: const EdgeInsets.all(12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        _box('Total Siswa', '${_summary['total'] ?? 0}', AppColors.primary),
-                        const SizedBox(width: 8),
-                        _box('Selesai', '${_summary['selesai'] ?? 0}', AppColors.success),
-                        const SizedBox(width: 8),
-                        _box('Belum', '${_summary['belum'] ?? 0}', AppColors.error),
-                      ],
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: SegmentedButton<String>(
-                    segments: const [ButtonSegment(value: 'Semua', label: Text('Semua')), ButtonSegment(value: 'Selesai', label: Text('Selesai')), ButtonSegment(value: 'Belum', label: Text('Belum'))],
-                    selected: {_filter},
-                    onSelectionChanged: (s) => setState(() => _filter = s.isEmpty ? _filter : s.first),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: filtered.isEmpty
-                      ? const EmptyState(icon: Icons.people, title: 'Belum Ada Data', subtitle: 'Belum ada siswa yang mengubah status. Siswa perlu verifikasi kode untuk laporan resmi.')
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(12),
-                          itemCount: filtered.length,
-                          itemBuilder: (ctx, i) {
-                            final s = filtered[i];
-                            final done = s.status == 'selesai';
-                            return Card(
-                              child: ListTile(
-                                leading: CircleAvatar(backgroundColor: done ? AppColors.successContainer : AppColors.errorContainer, child: Icon(done ? Icons.check : Icons.pending, color: done ? AppColors.success : AppColors.error, size: 18)),
-                                title: Text(s.siswaNama ?? s.siswaId, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                                subtitle: Text(done ? 'Selesai pada ${s.selesaiPada != null ? s.selesaiPada.toString() : "-"}' : 'Belum selesai', style: const TextStyle(fontSize: 12)),
-                                trailing: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: done ? AppColors.successContainer : AppColors.errorContainer, borderRadius: BorderRadius.circular(6)), child: Text(done ? 'Selesai' : 'Belum', style: TextStyle(color: done ? AppColors.success : AppColors.error, fontSize: 11, fontWeight: FontWeight.w600))),
-                              ),
-                            );
-                          },
-                        ),
-                ),
-              ],
-            ),
-    );
-  }
+      appBar: AppBar(title: const Text('Status Penyelesaian')),
+      body: RefreshIndicator(
+        onRefresh: () async => ref.invalidate(taskStatusProvider(widget.taskId)),
+        child: async.when(
+          loading: () => ListView(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            children: const [SizedBox(height: AppSpacing.xl), AppSkeletonList(count: 4)],
+          ),
+          error: (e, _) => ListView(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            children: [
+              const SizedBox(height: AppSpacing.xl),
+              AppErrorState(
+                error: e,
+                onRetry: () => ref.invalidate(taskStatusProvider(widget.taskId)),
+              ),
+            ],
+          ),
+          data: (data) {
+            final list = data.rows;
+            final filtered = switch (_filter) {
+              'selesai' => list.where((e) => e.status == 'selesai').toList(),
+              'belum' => list.where((e) => e.status != 'selesai').toList(),
+              _ => list,
+            };
 
-  Widget _box(String label, String value, Color c) {
-    return Expanded(child: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: c.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: Column(children: [Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: 18)), Text(label, style: const TextStyle(fontSize: 11), textAlign: TextAlign.center)])));
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.xxl),
+              children: [
+                AppHeroHeader(
+                  compact: true,
+                  eyebrow: 'Laporan resmi',
+                  title: 'Status Siswa',
+                  subtitle: 'Hanya status yang dilaporkan dengan kode akses terverifikasi yang dihitung.',
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
+                    Expanded(child: MetricTile(label: 'Total siswa', value: '${data.summary['total'] ?? 0}', icon: Icons.groups_rounded)),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: MetricTile(
+                        label: 'Selesai',
+                        value: '${data.summary['selesai'] ?? 0}',
+                        icon: Icons.task_alt_rounded,
+                        color: AppColors.success,
+                        background: AppColors.successContainer,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: MetricTile(
+                        label: 'Belum',
+                        value: '${data.summary['belum'] ?? 0}',
+                        icon: Icons.pending_actions_rounded,
+                        color: AppColors.error,
+                        background: AppColors.errorContainer,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(value: 'semua', label: Text('Semua')),
+                    ButtonSegment(value: 'selesai', label: Text('Selesai')),
+                    ButtonSegment(value: 'belum', label: Text('Belum')),
+                  ],
+                  selected: {_filter},
+                  onSelectionChanged: (selection) =>
+                      setState(() => _filter = selection.isEmpty ? _filter : selection.first),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                if (filtered.isEmpty)
+                  AppCard(
+                    child: AppEmptyState(
+                      icon: Icons.people_outline_rounded,
+                      title: 'Belum ada laporan',
+                      subtitle: list.isEmpty
+                          ? 'Siswa perlu memverifikasi kode akses dan menandai tugas selesai untuk muncul di sini.'
+                          : 'Tidak ada siswa pada filter ini.',
+                      actionLabel: list.isEmpty ? null : 'Lihat semua',
+                      onAction: list.isEmpty ? null : () => setState(() => _filter = 'semua'),
+                    ),
+                  )
+                else
+                  ...filtered.map((row) {
+                    final done = row.status == 'selesai';
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: AppCard(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        child: Row(
+                          children: [
+                            InitialsAvatar(name: row.siswaNama ?? 'Siswa', size: 38),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    row.siswaNama ?? 'Siswa',
+                                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                                  ),
+                                  Text(
+                                    done
+                                        ? 'Selesai ${row.selesaiPada == null ? '' : '• ${AppDateUtils.formatTanggalJam(row.selesaiPada)}'}'
+                                        : 'Belum selesai',
+                                    style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: done ? AppColors.successContainer : AppColors.errorContainer,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                done ? 'Selesai' : 'Belum',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: done ? AppColors.success : AppColors.error,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+              ],
+            );
+          },
+        ),
+      ),
+    );
   }
 }

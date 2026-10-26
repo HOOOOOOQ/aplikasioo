@@ -7,12 +7,19 @@ name: Verify Flutter (analyze + test)
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   analyze-test:
@@ -32,8 +39,53 @@ jobs:
         run: flutter pub get
 
       # Info/warning lama di repo tidak memblokir; ERROR analyzer tetap gagal.
+      # Output disimpan ke analyze.log agar bisa dipublikasikan ke PR (log job
+      # mentah tidak bisa diunduh dari luar lewat blob storage).
       - name: Analyze (fatal on errors)
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+        run: |
+          set -o pipefail
+          flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee analyze.log
+
+      - name: Publikasikan hasil analyze ke PR
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ ! -f analyze.log ]; then
+            echo "analyze.log tidak ada (langkah analyze tidak jalan)."
+            exit 0
+          fi
+          {
+            echo '### Hasil `flutter analyze`'
+            echo
+            echo '```'
+            head -c 55000 analyze.log
+            echo '```'
+          } > comment.md
+          gh pr comment "$PR" --body-file comment.md --edit-last \
+            || gh pr comment "$PR" --body-file comment.md
 
       - name: Unit & widget tests
-        run: flutter test
+        run: |
+          set -o pipefail
+          flutter test 2>&1 | tee test.log
+
+      - name: Publikasikan hasil test ke PR
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ ! -f test.log ]; then
+            echo "test.log tidak ada (langkah test tidak jalan)."
+            exit 0
+          fi
+          {
+            echo '### Hasil `flutter test`'
+            echo
+            echo '```'
+            tail -c 20000 test.log
+            echo '```'
+          } > test-comment.md
+          gh pr comment "$PR" --body-file test-comment.md

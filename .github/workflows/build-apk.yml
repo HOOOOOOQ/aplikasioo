@@ -10,9 +10,16 @@ on:
   push:
     branches:
       - main
+    # Perubahan dokumentasi tidak perlu membangun ulang APK.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   workflow_dispatch:
 
 permissions:
@@ -277,6 +284,13 @@ jobs:
               [ -f "$apk" ] || continue
               echo "| $(basename "$apk") | $(du -h "$apk" | cut -f1) | \`$(sha256sum "$apk" | cut -c1-32)…\` |"
             done
+            echo ""
+            echo "<details><summary>SHA256SUMS.txt (lengkap)</summary>"
+            echo ""
+            echo '```'
+            cat SHA256SUMS.txt 2>/dev/null || echo "(belum tersedia)"
+            echo '```'
+            echo "</details>"
             for apk in dist/*.apk; do
               [ -f "$apk" ] || continue
               echo ""
