@@ -87,8 +87,21 @@ serve(async (req: Request) => {
     } = await admin.auth.getUser(token);
 
     if (userErr || !user) {
+      const errMsg = (userErr?.message ?? "").toLowerCase();
       // Log hanya metadata aman (pesan error), tanpa token/credential.
       console.warn("create-teacher: verifikasi token gagal:", userErr?.message ?? "user null");
+
+      // Ini BUKAN kesalahan admin: service_role key tidak cocok dengan SUPABASE_URL
+      // (mis. secret diambil dari project lain). Balas 500, bukan 401.
+      if (errMsg.includes("api key") || errMsg.includes("apikey")) {
+        console.error("create-teacher: service role key tidak cocok dengan project URL");
+        return json(500, {
+          error:
+            "Server misconfigured: SUPABASE_SERVICE_ROLE_KEY tidak cocok dengan SUPABASE_URL project ini.",
+          code: "server_misconfigured",
+        });
+      }
+
       return json(401, {
         error: "Unauthorized: token admin tidak valid atau sudah kedaluwarsa.",
         code: "invalid_token",
@@ -188,6 +201,23 @@ serve(async (req: Request) => {
 
     if (createErr || !created?.user) {
       const message = createErr?.message ?? "Gagal membuat user";
+      const lowerMessage = message.toLowerCase();
+
+      // Service role key yang salah/tidak berhak tidak boleh terlihat seperti input salah.
+      if (
+        createErr?.status === 403 ||
+        lowerMessage.includes("permission") ||
+        lowerMessage.includes("service_role") ||
+        lowerMessage.includes("not allowed")
+      ) {
+        console.error("create-teacher: Auth Admin API menolak service role key");
+        return json(500, {
+          error:
+            "Server tidak berhak membuat user. Periksa SUPABASE_SERVICE_ROLE_KEY (harus service_role project ini).",
+          code: "server_misconfigured",
+        });
+      }
+
       const duplicated = /already|registered|exists/i.test(message);
       return json(duplicated ? 409 : 400, {
         error: message,

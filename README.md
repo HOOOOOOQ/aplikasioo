@@ -179,7 +179,7 @@ tetapi `auth.getUser(token)` menolak token admin. Penyebab yang mungkin:
 | 401 `{code: 401, message: "Invalid JWT"}` | Ditandatangani/ditolak gateway | Sama seperti di atas; pastikan `verify_jwt=true` pada project yang benar |
 | 403 `{error: "Forbidden ..."}` | Token valid, tapi `profiles.role != admin` atau `is_active != true` | Perbaiki baris `profiles` |
 | 404 | Function belum dideploy | `supabase functions deploy create-teacher` |
-| 500 `server_misconfigured` | Secret server belum ada | Set `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` |
+| 500 `server_misconfigured` | Secret server belum ada **atau** `SUPABASE_SERVICE_ROLE_KEY` berasal dari project lain | Set `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` dari project yang sama |
 
 > Aplikasi **tidak** mematikan verifikasi dan **tidak** memakai `service_role` di client.
 > `service_role` hanya dipakai di dalam Edge Function.
