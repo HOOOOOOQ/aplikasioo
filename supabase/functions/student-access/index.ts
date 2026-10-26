@@ -48,6 +48,31 @@ function json(status: number, payload: JsonMap): Response {
   });
 }
 
+/**
+ * Error "objek database belum ada" (migration 004/005 belum dijalankan) atau
+ * schema cache basi. Dibedakan dari gangguan server supaya pengguna mendapat
+ * pesan yang bisa ditindaklanjuti, bukan "Gagal memverifikasi kode".
+ */
+function isSchemaMissing(error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false;
+  const code = String(error.code ?? "");
+  if (["PGRST205", "PGRST202", "42P01", "42883"].includes(code)) return true;
+  const msg = String(error.message ?? "").toLowerCase();
+  return msg.includes("could not find the table") ||
+    msg.includes("could not find the function") ||
+    msg.includes("schema cache") ||
+    (msg.includes("relation") && msg.includes("does not exist"));
+}
+
+function schemaNotReadyResponse(): Response {
+  return json(503, {
+    error:
+      "Skema kode akses belum tersedia di database. Hubungi admin sekolah " +
+      "(migration 005_access_codes_schema_repair.sql belum dijalankan).",
+    code: "schema_not_ready",
+  });
+}
+
 function base64url(bytes: Uint8Array): string {
   let binary = "";
   for (const b of bytes) binary += String.fromCharCode(b);
@@ -148,12 +173,19 @@ serve(async (req: Request) => {
 
     // ---------- Rate limit ----------
     const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MINUTES * 60_000).toISOString();
-    const { count: failures } = await client
+    const { count: failures, error: limitErr } = await client
       .from("kode_akses_attempt")
       .select("id", { count: "exact", head: true })
       .eq("ip", ip)
       .eq("success", false)
       .gte("created_at", windowStart);
+
+    if (limitErr) {
+      console.error("student-access: rate limit tidak tersedia", limitErr.code);
+      if (isSchemaMissing(limitErr)) return schemaNotReadyResponse();
+      // Rate limit gagal karena sebab lain: jangan blokir verifikasi kode,
+      // tetapi catat agar terlihat di log server.
+    }
 
     if ((failures ?? 0) >= RATE_LIMIT_MAX_FAILURES) {
       return json(429, {
@@ -164,7 +196,8 @@ serve(async (req: Request) => {
 
     const recordAttempt = async (success: boolean) => {
       try {
-        await client.from("kode_akses_attempt").insert({ ip, success });
+        const { error } = await client.from("kode_akses_attempt").insert({ ip, success });
+        if (error) console.warn("student-access: gagal mencatat percobaan", error.code);
       } catch (_) {
         // pencatatan rate limit tidak boleh menggagalkan permintaan
       }
@@ -192,8 +225,13 @@ serve(async (req: Request) => {
         .eq("id", claim.kodeId)
         .maybeSingle();
 
-      if (kodeErr || !kodeRow) {
-        return json(404, { error: "Kode tidak ditemukan.", code: "not_found" });
+      if (kodeErr) {
+        console.error("student-access: lookup kode kelas gagal", kodeErr.code);
+        if (isSchemaMissing(kodeErr)) return schemaNotReadyResponse();
+        return json(500, { error: "Gagal memverifikasi kode.", code: "lookup_failed" });
+      }
+      if (!kodeRow) {
+        return json(404, { error: "Kode tidak ditemukan.", code: "kode_not_found" });
       }
 
       const { data: claimResult, error: claimErr } = await client.rpc("claim_kode_akses", {
@@ -202,6 +240,7 @@ serve(async (req: Request) => {
       });
       if (claimErr) {
         console.error("student-access: claim gagal", claimErr.code);
+        if (isSchemaMissing(claimErr)) return schemaNotReadyResponse();
         return json(500, { error: "Gagal memverifikasi kode.", code: "claim_failed" });
       }
       const result = (claimResult ?? {}) as JsonMap;
@@ -255,7 +294,7 @@ serve(async (req: Request) => {
     const normalized = normalizeCode(rawCode);
     if (normalized.length < 6) {
       await recordAttempt(false);
-      return json(404, { error: "Kode tidak ditemukan.", code: "not_found" });
+      return json(404, { error: "Kode tidak ditemukan.", code: "kode_not_found" });
     }
 
     const kodeHash = await sha256Hex(normalized);
@@ -267,6 +306,7 @@ serve(async (req: Request) => {
 
     if (kodeLookupErr) {
       console.error("student-access: lookup kode gagal", kodeLookupErr.code);
+      if (isSchemaMissing(kodeLookupErr)) return schemaNotReadyResponse();
       return json(500, { error: "Gagal memverifikasi kode.", code: "lookup_failed" });
     }
 
@@ -293,6 +333,7 @@ serve(async (req: Request) => {
         });
         if (claimErr) {
           console.error("student-access: claim gagal", claimErr.code);
+          if (isSchemaMissing(claimErr)) return schemaNotReadyResponse();
           return json(500, { error: "Gagal memverifikasi kode.", code: "claim_failed" });
         }
         const result = (claimResult ?? {}) as JsonMap;
@@ -366,6 +407,7 @@ serve(async (req: Request) => {
 
     if (legacyErr) {
       console.error("student-access: lookup legacy gagal", legacyErr.code);
+      if (isSchemaMissing(legacyErr)) return schemaNotReadyResponse();
       return json(500, { error: "Gagal memverifikasi kode.", code: "lookup_failed" });
     }
     if (!legacySiswa) {
@@ -430,7 +472,7 @@ function codeErrorResponse(reason: string): Response {
     default:
       return json(404, {
         error: "Kode tidak ditemukan. Periksa kembali penulisannya.",
-        code: "not_found",
+        code: "kode_not_found",
       });
   }
 }

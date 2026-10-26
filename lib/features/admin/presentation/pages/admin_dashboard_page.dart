@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/session_guard.dart';
+import '../../../../core/utils/app_error.dart';
 import '../../../../core/utils/date_utils.dart';
 import '../../../../core/utils/deadline_helper.dart';
 import '../../../../core/widgets/app_card.dart';
@@ -14,35 +16,66 @@ import '../../../../shared/repositories/akun_repository.dart';
 import '../../../../shared/repositories/siswa_repository.dart';
 import '../../../../shared/repositories/tugas_repository.dart';
 import '../../../auth/presentation/auth_provider.dart';
+import '../widgets/schema_health_dialog.dart';
+
 
 class _DashboardData {
   final int siswa;
-  final Map<String, int> counts;
+  final DashboardCounts counts;
   final List<Tugas> tugas;
   final List<AuditEntry> audit;
+
+  /// Bagian yang gagal dimuat (mis. `tugas`/`audit`) tapi tidak fatal.
+  final Map<String, AppError> issues;
 
   const _DashboardData({
     required this.siswa,
     required this.counts,
     required this.tugas,
     required this.audit,
+    required this.issues,
   });
+
+  bool get hasIssues => issues.isNotEmpty || counts.hasIssues;
+
+  bool get schemaNotReady =>
+      counts.schemaNotReady || issues.values.any((e) => e.code == 'schema_not_ready');
 }
 
 final adminDashboardProvider = FutureProvider.autoDispose<_DashboardData>((ref) async {
   final akun = ref.watch(akunRepositoryProvider);
-  final results = await Future.wait([
-    SiswaRepository().countAll(),
+  final issues = <String, AppError>{};
+
+  /// Satu kartu yang gagal tidak boleh menjatuhkan seluruh halaman.
+  /// Error sesi/jaringan tetap diteruskan agar UI meminta login/retry.
+  Future<T> safe<T>(String key, Future<T> future, T fallback) async {
+    try {
+      return await future;
+    } catch (e) {
+      final error = AppError.from(e);
+      if (SessionGuard.isSessionErrorCode(error.code) ||
+          error.code == 'network' ||
+          error.code == 'timeout') {
+        rethrow;
+      }
+      issues[key] = error;
+      return fallback;
+    }
+  }
+
+  final results = await Future.wait<Object>([
+    safe<int>('siswa', SiswaRepository().countAll(), 0),
     akun.fetchDashboardCounts(),
-    TugasRepository().fetchAll(limit: 5),
-    akun.fetchAudit(limit: 6),
+    safe<List<Tugas>>('tugas', TugasRepository().fetchAll(limit: 5), const <Tugas>[]),
+    safe<List<AuditEntry>>('audit', akun.fetchAudit(limit: 6), const <AuditEntry>[]),
   ]);
 
   return _DashboardData(
     siswa: results[0] as int,
-    counts: results[1] as Map<String, int>,
+    counts: results[1] as DashboardCounts,
     tugas: results[2] as List<Tugas>,
     audit: results[3] as List<AuditEntry>,
+    issues: issues,
   );
 });
 
@@ -74,10 +107,20 @@ class AdminDashboardPage extends ConsumerWidget {
           const SizedBox(height: AppSpacing.lg),
           async.when(
             loading: () => const AppSkeletonList(count: 3),
-            error: (e, _) => AppErrorState(
-              error: e,
-              onRetry: () => ref.invalidate(adminDashboardProvider),
-            ),
+            error: (e, _) {
+              final error = AppError.from(e);
+              if (SessionGuard.isSessionErrorCode(error.code)) {
+                return _SessionExpiredView(error: error);
+              }
+              return AppErrorState(
+                error: error,
+                onRetry: () => ref.invalidate(adminDashboardProvider),
+                actionLabel: error.code == 'schema_not_ready' ? 'Periksa skema' : null,
+                onAction: error.code == 'schema_not_ready'
+                    ? () => showSchemaHealthDialog(context)
+                    : null,
+              );
+            },
             data: (data) => _buildContent(context, ref, data),
           ),
         ],
@@ -91,6 +134,22 @@ class AdminDashboardPage extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (data.hasIssues) ...[
+          AppNotice.warning(
+            title: data.schemaNotReady ? 'Skema database belum lengkap' : 'Sebagian data gagal dimuat',
+            text: data.schemaNotReady
+                ? 'Beberapa angka belum bisa dihitung karena tabel/fungsi database belum '
+                    'tersedia. Jalankan migration 005, lalu tekan Periksa skema. Nilai yang '
+                    'gagal dimuat ditampilkan sebagai "—", bukan 0.'
+                : 'Nilai yang gagal dimuat ditampilkan sebagai "—" agar tidak menyesatkan. '
+                    'Periksa daftar masalahnya, lalu muat ulang.',
+            action: TextButton(
+              onPressed: () => showSchemaHealthDialog(context),
+              child: const Text('Periksa skema'),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+        ],
         GridView.count(
           crossAxisCount: 2,
           shrinkWrap: true,
@@ -107,7 +166,7 @@ class AdminDashboardPage extends ConsumerWidget {
             ),
             MetricTile(
               label: 'Guru aktif',
-              value: '${counts['guru'] ?? 0}',
+              value: counts.has('guru') ? '${counts['guru']}' : '—',
               icon: Icons.badge_rounded,
               color: AppColors.info,
               background: AppColors.infoContainer,
@@ -115,7 +174,7 @@ class AdminDashboardPage extends ConsumerWidget {
             ),
             MetricTile(
               label: 'Kelas',
-              value: '${counts['kelas'] ?? 0}',
+              value: counts.has('kelas') ? '${counts['kelas']}' : '—',
               icon: Icons.class_rounded,
               color: AppColors.success,
               background: AppColors.successContainer,
@@ -123,7 +182,7 @@ class AdminDashboardPage extends ConsumerWidget {
             ),
             MetricTile(
               label: 'Tugas terbit',
-              value: '${counts['tugas'] ?? 0}',
+              value: counts.has('tugas') ? '${counts['tugas']}' : '—',
               icon: Icons.assignment_rounded,
               color: AppColors.warning,
               background: AppColors.warningContainer,
@@ -131,14 +190,14 @@ class AdminDashboardPage extends ConsumerWidget {
             ),
             MetricTile(
               label: 'Jadwal',
-              value: '${counts['jadwal'] ?? 0}',
+              value: counts.has('jadwal') ? '${counts['jadwal']}' : '—',
               icon: Icons.schedule_rounded,
               color: AppColors.primaryDark,
               onTap: () => context.go('/admin/jadwal'),
             ),
             MetricTile(
               label: 'Kode akses aktif',
-              value: '${counts['kode_aktif'] ?? 0}',
+              value: counts.has('kode_aktif') ? '${counts['kode_aktif']}' : '—',
               icon: Icons.key_rounded,
               color: AppColors.info,
               background: AppColors.infoContainer,
@@ -360,6 +419,49 @@ class _QuickAction extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Tampilan saat sesi benar-benar tidak valid (bukan error database/jaringan).
+///
+/// Aplikasi tidak mencoba "menyembuhkan" sesi dengan token buatan: admin
+/// diminta masuk kembali melalui alur login resmi.
+class _SessionExpiredView extends ConsumerWidget {
+  final AppError error;
+
+  const _SessionExpiredView({required this.error});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return AppCard(
+      child: Column(
+        children: [
+          const Icon(Icons.lock_clock_rounded, size: 40, color: AppColors.warning),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            error.title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            error.hint ?? error.message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12.5, height: 1.5, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          FilledButton.icon(
+            onPressed: () async {
+              await ref.read(authControllerProvider.notifier).signOut();
+              ref.invalidate(currentUserProvider);
+              if (context.mounted) context.go('/login');
+            },
+            icon: const Icon(Icons.login_rounded, size: 18),
+            label: const Text('Masuk kembali'),
+          ),
+        ],
       ),
     );
   }

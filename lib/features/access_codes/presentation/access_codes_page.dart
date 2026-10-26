@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/session_guard.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../core/widgets/app_card.dart';
@@ -16,6 +18,7 @@ import '../../../shared/repositories/jadwal_repository.dart';
 import '../../../shared/repositories/kelas_repository.dart';
 import '../../../shared/repositories/siswa_repository.dart';
 import '../../../shared/services/supabase_service.dart';
+import '../../auth/presentation/auth_provider.dart';
 import '../data/access_code_repository.dart';
 import '../domain/access_code.dart';
 
@@ -29,9 +32,21 @@ class AccessCodesPage extends ConsumerStatefulWidget {
   ConsumerState<AccessCodesPage> createState() => _AccessCodesPageState();
 }
 
+/// Hasil satu kali pemuatan halaman: daftar kode + statistik.
+///
+/// Statistik diambil dari database (RPC). Bila RPC belum tersedia, angkanya
+/// dihitung dari daftar yang berhasil dimuat dan ditandai [approximate].
+class _CodesBundle {
+  final List<AccessCode> codes;
+  final AccessCodeStats stats;
+  final AppError? statsError;
+
+  const _CodesBundle({required this.codes, required this.stats, this.statsError});
+}
+
 class _AccessCodesPageState extends ConsumerState<AccessCodesPage> {
   final TextEditingController _searchC = TextEditingController();
-  late Future<List<AccessCode>> _future;
+  late Future<_CodesBundle> _future;
   AccessCodeStatus? _statusFilter;
   String _search = '';
 
@@ -41,13 +56,67 @@ class _AccessCodesPageState extends ConsumerState<AccessCodesPage> {
     _future = _load();
   }
 
-  Future<List<AccessCode>> _load() {
-    return ref.read(accessCodeRepositoryProvider).fetchCodes();
+  Future<_CodesBundle> _load() async {
+    final repo = ref.read(accessCodeRepositoryProvider);
+    final codes = await repo.fetchCodes();
+
+    AccessCodeStats stats;
+    AppError? statsError;
+    try {
+      stats = await repo.fetchStats();
+    } catch (e) {
+      statsError = AppError.from(e);
+      stats = AccessCodeStats.fromList(codes);
+    }
+
+    return _CodesBundle(codes: codes, stats: stats, statsError: statsError);
   }
 
   Future<void> _refresh() async {
     setState(() => _future = _load());
-    await _future;
+    try {
+      await _future;
+    } catch (_) {
+      // Error sudah ditampilkan oleh FutureBuilder; jangan biarkan
+      // RefreshIndicator melempar exception ke framework.
+    }
+  }
+
+  /// Sesi habis / belum login → arahkan ke halaman masuk.
+  Future<void> _handleIfSessionExpired(AppError error) async {
+    if (!SessionGuard.isSessionErrorCode(error.code)) return;
+    if (!mounted) return;
+
+    // Router diambil sebelum await agar tidak memakai BuildContext setelah jeda
+    // async (lint use_build_context_synchronously).
+    final router = GoRouter.of(context);
+
+    await ref.read(authControllerProvider.notifier).signOut();
+    // Pastikan profil lama tidak tersisa di cache setelah sesi dibuang.
+    ref.invalidate(currentUserProvider);
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.lock_clock_rounded, size: 30, color: AppColors.warning),
+        title: Text(error.title),
+        content: Text(error.shortMessage),
+        actions: [
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              router.go('/login');
+            },
+            child: const Text('Masuk kembali'),
+          ),
+        ],
+      ),
+    );
+
+    // Bila dialog ditutup lewat tombol back, tetap arahkan ke halaman masuk.
+    if (mounted) router.go('/login');
   }
 
   Future<List<Kelas>> _allowedKelas() async {
@@ -71,7 +140,12 @@ class _AccessCodesPageState extends ConsumerState<AccessCodesPage> {
       kelasList = await _allowedKelas();
     } catch (e) {
       if (!mounted) return;
-      showAppSnackBar(context, AppError.from(e).shortMessage, isError: true);
+      final error = AppError.from(e);
+      if (SessionGuard.isSessionErrorCode(error.code)) {
+        await _handleIfSessionExpired(error);
+        return;
+      }
+      showAppSnackBar(context, error.shortMessage, isError: true);
       return;
     }
 
@@ -90,7 +164,11 @@ class _AccessCodesPageState extends ConsumerState<AccessCodesPage> {
     final issued = await showModalBottomSheet<IssuedAccessCode>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => _IssueCodeSheet(kelasList: kelasList, isTeacher: widget.isTeacher),
+      builder: (ctx) => _IssueCodeSheet(
+        kelasList: kelasList,
+        isTeacher: widget.isTeacher,
+        onSessionExpired: _handleIfSessionExpired,
+      ),
     );
 
     if (issued == null) return;
@@ -184,7 +262,12 @@ class _AccessCodesPageState extends ConsumerState<AccessCodesPage> {
       await _refresh();
     } catch (e) {
       if (!mounted) return;
-      showAppSnackBar(context, AppError.from(e).shortMessage, isError: true);
+      final error = AppError.from(e);
+      if (SessionGuard.isSessionErrorCode(error.code)) {
+        await _handleIfSessionExpired(error);
+        return;
+      }
+      showAppSnackBar(context, error.shortMessage, isError: true);
     }
   }
 
@@ -205,10 +288,13 @@ class _AccessCodesPageState extends ConsumerState<AccessCodesPage> {
       ),
       body: RefreshIndicator(
         onRefresh: _refresh,
-        child: FutureBuilder<List<AccessCode>>(
+        child: FutureBuilder<_CodesBundle>(
           future: _future,
           builder: (context, snapshot) {
-            final all = snapshot.data ?? const <AccessCode>[];
+            final bundle = snapshot.data;
+            final all = bundle?.codes ?? const <AccessCode>[];
+            final stats = bundle?.stats ?? AccessCodeStats.empty;
+            final statsError = bundle?.statsError;
 
             var filtered = all;
             if (_statusFilter != null) {
@@ -236,13 +322,15 @@ class _AccessCodesPageState extends ConsumerState<AccessCodesPage> {
                   subtitle: widget.isTeacher
                       ? 'Terbitkan kode untuk kelas yang Anda ampu.'
                       : 'Kelola kode untuk menghubungkan identitas siswa.',
-                  footer: Row(
+                  footer: Wrap(
+                    spacing: AppSpacing.lg,
+                    runSpacing: AppSpacing.sm,
                     children: [
-                      _heroStat('Total', '${all.length}'),
-                      const SizedBox(width: AppSpacing.lg),
-                      _heroStat('Aktif', '${all.where((c) => c.isActive).length}'),
-                      const SizedBox(width: AppSpacing.lg),
-                      _heroStat('Dipakai', '${all.where((c) => c.status == AccessCodeStatus.used).length}'),
+                      _heroStat('Total', '${stats.total}'),
+                      _heroStat('Aktif', '${stats.active}'),
+                      _heroStat('Dipakai', '${stats.used}'),
+                      _heroStat('Kedaluwarsa', '${stats.expired}'),
+                      _heroStat('Dicabut', '${stats.revoked}'),
                     ],
                   ),
                 ),
@@ -253,6 +341,18 @@ class _AccessCodesPageState extends ConsumerState<AccessCodesPage> {
                       'ditampilkan sekali saat dibuat. Verifikasi dilakukan server, sehingga kode '
                       'tidak bisa dipalsukan dari aplikasi.',
                 ),
+                if (stats.approximate) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  AppNotice.warning(
+                    title: 'Statistik sementara',
+                    text: statsError?.code == 'schema_not_ready'
+                        ? 'Statistik dari server belum tersedia karena skema database belum '
+                            'lengkap. Angka di atas dihitung dari ${all.length} kode terbaru. '
+                            'Jalankan migration 005 lalu muat ulang halaman.'
+                        : 'Statistik server gagal dimuat, jadi angka di atas dihitung dari '
+                            '${all.length} kode terbaru.',
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.lg),
                 AppSearchField(
                   controller: _searchC,
@@ -276,7 +376,16 @@ class _AccessCodesPageState extends ConsumerState<AccessCodesPage> {
                 if (snapshot.connectionState == ConnectionState.waiting)
                   const AppSkeletonList(count: 4)
                 else if (snapshot.hasError)
-                  AppErrorState(error: snapshot.error, onRetry: _refresh)
+                  AppErrorState(
+                    error: snapshot.error,
+                    onRetry: _refresh,
+                    actionLabel: AppError.from(snapshot.error!).code == 'schema_not_ready'
+                        ? 'Buka Pengaturan'
+                        : null,
+                    onAction: AppError.from(snapshot.error!).code == 'schema_not_ready'
+                        ? () => context.go(widget.isTeacher ? '/guru/profil' : '/admin/pengaturan')
+                        : null,
+                  )
                 else if (filtered.isEmpty)
                   AppCard(
                     child: AppEmptyState(
@@ -467,7 +576,14 @@ class _IssueCodeSheet extends ConsumerStatefulWidget {
   final List<Kelas> kelasList;
   final bool isTeacher;
 
-  const _IssueCodeSheet({required this.kelasList, required this.isTeacher});
+  /// Dipanggil bila server menolak karena sesi berakhir; sheet ditutup dulu.
+  final Future<void> Function(AppError error)? onSessionExpired;
+
+  const _IssueCodeSheet({
+    required this.kelasList,
+    required this.isTeacher,
+    this.onSessionExpired,
+  });
 
   @override
   ConsumerState<_IssueCodeSheet> createState() => _IssueCodeSheetState();
@@ -520,6 +636,8 @@ class _IssueCodeSheetState extends ConsumerState<_IssueCodeSheet> {
   }
 
   Future<void> _submit() async {
+    // Cegah klik ganda: dua permintaan bisa menerbitkan dua kode.
+    if (_submitting) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_forSingleStudent && _siswaId == null) {
       setState(() => _error = const AppError(
@@ -546,8 +664,16 @@ class _IssueCodeSheetState extends ConsumerState<_IssueCodeSheet> {
       if (!mounted) return;
       Navigator.pop(context, issued);
     } catch (e) {
+      final error = AppError.from(e);
+      final handler = widget.onSessionExpired;
+      if (SessionGuard.isSessionErrorCode(error.code) && handler != null) {
+        if (!mounted) return;
+        Navigator.pop(context);
+        await handler(error);
+        return;
+      }
       if (!mounted) return;
-      setState(() => _error = AppError.from(e));
+      setState(() => _error = error);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }

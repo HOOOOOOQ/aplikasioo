@@ -100,9 +100,22 @@ class _StudentTaskDetailPageState extends ConsumerState<StudentTaskDetailPage> {
     } catch (e) {
       if (!mounted) return;
       final error = AppError.from(e);
+      // Token identitas siswa (HMAC) berbeda dari sesi login admin/guru.
+      const identityCodes = {
+        'student_token_missing',
+        'student_token_invalid',
+        'student_token_expired',
+        'token_expired',
+        'token_mismatch',
+        'missing_token',
+        'invalid_token',
+        'unauthorized',
+      };
+      final identityIssue = identityCodes.contains(error.code) ||
+          error.message.toLowerCase().contains('verifikasi ulang kode');
       showAppSnackBar(
         context,
-        error.code == 'unauthorized' || error.message.toLowerCase().contains('sesi')
+        identityIssue
             ? 'Sesi identitas berakhir. Verifikasi ulang kode akses di halaman Identitas.'
             : error.shortMessage,
         isError: true,

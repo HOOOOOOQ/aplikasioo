@@ -9,7 +9,7 @@ class AppInfo {
   static const String appName = 'EduTask';
   static const String tagline = 'Tugas & Jadwal Sekolah';
   static const String packageName = 'com.edutask.sekolah';
-  static const String version = '1.1.0';
+  static const String version = '1.2.0';
   static const String copyright = '© 2026 PALL. All rights reserved.';
   static const String teamMotto = 'From 3 Person To All';
 
