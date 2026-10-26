@@ -299,32 +299,44 @@ release lolos validasi paket serta tanda tangan.
 
 ## 10. APK hasil build CI
 
-Build **#67** dari commit `2214ea6` (branch `arena/d5efb306-aplikasioo`, PR #56):
+### 10.1 Rilis publik (yang dipakai pengguna)
 
-| File | Ukuran (`du`) | SHA-256 |
+`https://github.com/HOOOOOOQ/aplikasioo/releases/tag/latest-apk` — build **#69** dari
+merge commit `85769b6` (PR #56 → `main`). Ukuran dan SHA-256 diambil langsung dari aset
+Release (bukan perkiraan):
+
+| File | Ukuran (byte) | SHA-256 |
 |---|---|---|
-| `EduTask-1.1.0-arm64-v8a.apk` | 26 MB | `b5724f859eb3d0025430cdb675c7fe88d5721cf6c835f1d923c19a344c60be73` |
-| `EduTask-1.1.0-armeabi-v7a.apk` | 23 MB | `781a9202a402820e26e2c14041a5b23c65ce158c722956d7e18dafa79fc01b3c` |
-| `EduTask-1.1.0-universal.apk` | 62 MB | `b549b677f7196e5a4e5f047c9d87e6738a3eac745eef1a6f849f2ecab9cfc783` |
-| `EduTask-1.1.0-x86_64.apk` | 27 MB | `623c9e73c4cf9d9d7ba016cc40e7c81d55db1c2a008db5614a121e55d9d21b67` |
+| `EduTask-1.1.0-arm64-v8a.apk` | 26.262.179 | `e49ee70082e35844cccf5b3018a6297df0f09afd12ea077ebae169d94c954d43` |
+| `EduTask-1.1.0-armeabi-v7a.apk` | 24.017.577 | `b9b861ee60559a55f147452be036ab48feb4aa6d268a9ffd501df34ebbb3c42a` |
+| `EduTask-1.1.0-universal.apk` | 64.969.840 | `7ef6db463e3834ec23d7b7126cd9486abc098da11c7b367b05d54605faef549d` |
+| `EduTask-1.1.0-x86_64.apk` | 27.368.090 | `a88e3d4f1fc04aa8209ae74f273d446f32090a6a04677efdf4b1ec7be4cd654e` |
 
-Informasi paket (dari `aapt`/`apksigner` di CI):
+`SHA256SUMS.txt` (375 byte) ikut dipublikasikan agar bisa diverifikasi dengan
+`sha256sum -c SHA256SUMS.txt`.
 
-- package `com.edutask.sekolah`, versionName `1.1.0`, versionCode `2067`
+### 10.2 Informasi paket (dari `aapt`/`apksigner` di CI)
+
+- package `com.edutask.sekolah`, versionName `1.1.0`, versionCode mengikuti nomor run (69)
 - minSdk **24** (Android 7.0), targetSdk **36**, compileSdk 36
 - signature v2 + v3 valid; sertifikat `CN=EduTask`, SHA-256
   `f3d985e457b01512b34091c25826869ed48fe9efd42b988375fc401562ffcbf9`
+  (sama dengan rilis ronde 1 → bisa menimpa instalasi lama tanpa uninstall)
 - ABI: arm64-v8a, armeabi-v7a, x86_64 (universal berisi ketiganya)
+- `zipalign -c -v 4` lulus
 
-**Lokasi unduhan:**
+### 10.3 APK di PR (sebelum merge)
 
-- Artefak build PR: tab **Actions → run Build EduTask APK #67 → Artifacts →
-  `edutask-apks`** (butuh login GitHub; tidak bisa diunduh dari sandbox ini).
-- Rilis publik: `https://github.com/HOOOOOOQ/aplikasioo/releases/tag/latest-apk`.
-  Rilis ini diperbarui **otomatis** ketika commit ini masuk ke `main`; nomor build dan
-  checksum akan berbeda karena `versionCode` mengikuti nomor run, sedangkan kodenya sama.
-  Checksum lengkap selalu tercantum di catatan rilis dan `SHA256SUMS.txt`.
+Build **#67** dan **#68** pada PR #56 juga menghasilkan 4 APK dan lolos validasi paket
+yang sama (checksum berbeda karena `versionCode` mengikuti nomor run). Artefaknya ada di
+tab **Actions → Build EduTask APK → Artifacts → `edutask-apks`** (butuh login GitHub).
 
-**Cara memasang:** unduh file `.apk` langsung ke HP → buka dari notifikasi/Files → izinkan
-"Install unknown apps". Bila muncul "Ada masalah saat mengurai paket", ikuti
-[`apk-install-troubleshooting.md`](apk-install-troubleshooting.md).
+### 10.4 Cara memasang
+
+1. Unduh `.apk` langsung ke HP (arm64-v8a untuk hampir semua HP modern).
+2. Buka dari notifikasi/Files → izinkan "Install unknown apps".
+3. Bila muncul "Ada masalah saat mengurai paket", ikuti
+   [`apk-install-troubleshooting.md`](apk-install-troubleshooting.md).
+
+**Belum diuji:** pemasangan dan cold start di HP fisik. Emulator CI gagal boot pada
+runner, jadi tidak ada bukti runtime — hanya validasi paket, tanda tangan, dan alignment.
