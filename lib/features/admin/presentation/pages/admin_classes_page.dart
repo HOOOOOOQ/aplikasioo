@@ -76,9 +76,9 @@ class _AdminClassesPageState extends State<AdminClassesPage> {
                 TextFormField(controller: tahunC, decoration: const InputDecoration(labelText: 'Tahun Ajaran')),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: waliKelasId,
+                  value: gurus.any((g) => (g['id']?.toString() ?? '') == waliKelasId) ? waliKelasId : null,
                   decoration: const InputDecoration(labelText: 'Wali Kelas (opsional)'),
-                  items: [const DropdownMenuItem(value: null, child: Text('- Tidak ada -')), ...gurus.map((g) => DropdownMenuItem(value: g['id'] as String, child: Text(g['full_name'] as String)))],
+                  items: [const DropdownMenuItem<String>(value: null, child: Text('- Tidak ada -')), ...gurus.map((g) => DropdownMenuItem(value: g['id']?.toString() ?? '', child: Text(g['full_name']?.toString() ?? '-')))],
                   onChanged: (v) => waliKelasId = v,
                 ),
               ],

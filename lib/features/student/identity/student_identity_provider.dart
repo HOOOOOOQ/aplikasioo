@@ -73,14 +73,14 @@ class StudentIdentityNotifier extends StateNotifier<StudentIdentity> {
           final siswa = data['siswa'] as Map<String, dynamic>;
           final token = data['token'] as String? ?? 'local-${DateTime.now().millisecondsSinceEpoch}';
           final sp = await SharedPreferences.getInstance();
-          await sp.setString(AppConstants.spStudentIdKey, siswa['id'] as String);
+          await sp.setString(AppConstants.spStudentIdKey, siswa['id']?.toString() ?? '');
           await sp.setString(AppConstants.spStudentCodeKey, kode);
           await sp.setString(AppConstants.spStudentTokenKey, token);
-          if (siswa['kelas_id'] != null) await sp.setString(AppConstants.spSelectedKelasId, siswa['kelas_id'] as String);
+          if (siswa['kelas_id'] != null) await sp.setString(AppConstants.spSelectedKelasId, siswa['kelas_id'].toString());
           state = StudentIdentity(
-            siswaId: siswa['id'] as String,
-            siswaNama: siswa['nama'] as String?,
-            kelasId: siswa['kelas_id'] as String?,
+            siswaId: siswa['id']?.toString() ?? '',
+            siswaNama: siswa['nama']?.toString(),
+            kelasId: siswa['kelas_id']?.toString(),
             kelasNama: siswa['kelas_nama'] as String?,
             kodeAkses: kode,
             token: token,
@@ -97,14 +97,14 @@ class StudentIdentityNotifier extends StateNotifier<StudentIdentity> {
       final kelasNama = (data['kelas'] is Map) ? (data['kelas'] as Map)['nama_kelas'] as String? : null;
       final token = 'local-${data['id']}-${DateTime.now().millisecondsSinceEpoch}';
       final sp = await SharedPreferences.getInstance();
-      await sp.setString(AppConstants.spStudentIdKey, data['id'] as String);
+      await sp.setString(AppConstants.spStudentIdKey, data['id']?.toString() ?? '');
       await sp.setString(AppConstants.spStudentCodeKey, kode);
       await sp.setString(AppConstants.spStudentTokenKey, token);
-      if (data['kelas_id'] != null) await sp.setString(AppConstants.spSelectedKelasId, data['kelas_id'] as String);
+      if (data['kelas_id'] != null) await sp.setString(AppConstants.spSelectedKelasId, data['kelas_id'].toString());
       state = StudentIdentity(
-        siswaId: data['id'] as String,
-        siswaNama: data['nama'] as String?,
-        kelasId: data['kelas_id'] as String?,
+        siswaId: data['id']?.toString() ?? '',
+        siswaNama: data['nama']?.toString(),
+        kelasId: data['kelas_id']?.toString(),
         kelasNama: kelasNama,
         kodeAkses: kode,
         token: token,

@@ -100,7 +100,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/guru/jadwal', builder: (ctx, s) => const TeacherSchedulesPage()),
           GoRoute(path: '/guru/tugas', builder: (ctx, s) => const TeacherTasksPage()),
           GoRoute(path: '/guru/tugas/tambah', builder: (ctx, s) => const TeacherTaskFormPage()),
-          GoRoute(path: '/guru/tugas/:id/edit', builder: (ctx, s) => TeacherTaskFormPage(taskId: s.pathParameters['id'])),
+          GoRoute(path: '/guru/tugas/:id/edit', builder: (ctx, s) {
+            final id = s.pathParameters['id'];
+            if (id == null || id.isEmpty) return Scaffold(body: Center(child: Text('ID tugas tidak valid')));
+            return TeacherTaskFormPage(taskId: id);
+          }),
           GoRoute(path: '/guru/tugas/:id/status', builder: (ctx, s) {
             final id = s.pathParameters['id'];
             if (id == null || id.isEmpty) return Scaffold(body: Center(child: Text('ID tugas tidak valid')));

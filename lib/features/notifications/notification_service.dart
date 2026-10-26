@@ -63,7 +63,10 @@ class NotificationService {
   }
 
   static Future<void> _schedule({required int id, required String title, required String body, required DateTime scheduledDate}) async {
-    final tzDate = tz.TZDateTime.from(scheduledDate, tz.getLocation('Asia/Jakarta'));
+    try { tz_data.initializeTimeZones(); } catch(_){}
+    tz.Location loc;
+    try { loc = tz.getLocation('Asia/Jakarta'); } catch(_) { loc = tz.local; }
+    final tzDate = tz.TZDateTime.from(scheduledDate, loc);
     const androidDetails = AndroidNotificationDetails(
       'edutask_deadline',
       'Pengingat Tenggat',

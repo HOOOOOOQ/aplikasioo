@@ -63,7 +63,7 @@ class _TeacherSchedulesPageState extends State<TeacherSchedulesPage> {
                         final isToday = j.hari == AppDateUtils.hariIndonesia(AppDateUtils.nowJakarta());
                         return Card(
                           child: ListTile(
-                            leading: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), decoration: BoxDecoration(color: isToday ? AppColors.successContainer : AppColors.primaryContainer, borderRadius: BorderRadius.circular(8)), child: Text(j.hari.substring(0, 3), style: TextStyle(color: isToday ? AppColors.success : AppColors.primary, fontWeight: FontWeight.bold, fontSize: 11))),
+                            leading: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), decoration: BoxDecoration(color: isToday ? AppColors.successContainer : AppColors.primaryContainer, borderRadius: BorderRadius.circular(8)), child: Text(j.hari.length >= 3 ? j.hari.substring(0, 3) : j.hari, style: TextStyle(color: isToday ? AppColors.success : AppColors.primary, fontWeight: FontWeight.bold, fontSize: 11))),
                             title: Text('${j.mataPelajaranNama ?? "-"} • ${AppDateUtils.formatJamFromString(j.jamMulai)}-${AppDateUtils.formatJamFromString(j.jamSelesai)}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                             subtitle: Text('${j.kelasNama ?? "-"} • ${j.ruang ?? "-"}', style: const TextStyle(fontSize: 12)),
                             trailing: isToday ? const Icon(Icons.today, color: AppColors.success) : null,

@@ -136,7 +136,7 @@ class _StudentSchedulePageState extends ConsumerState<StudentSchedulePage> {
                                 ],
                               ),
                             ),
-                            for (final j in grouped[hari]!)
+                            for (final j in grouped[hari] ?? const [])
                               Card(
                                 child: ListTile(
                                   leading: Container(

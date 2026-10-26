@@ -135,7 +135,8 @@ class TugasRepository {
     try {
       final totalSiswaData = await c.from('tugas').select('kelas_id').eq('id', tugasId).maybeSingle();
       if (totalSiswaData == null) return {'total': 0, 'selesai': 0, 'belum': 0};
-      final kelasId = (totalSiswaData as Map)['kelas_id'] as String;
+      final kelasId = (totalSiswaData as Map)['kelas_id'] as String? ?? '';
+      if (kelasId.isEmpty) return {'total': 0, 'selesai': 0, 'belum': 0};
       final totalRes = await c.from('siswa').select('id').eq('kelas_id', kelasId).eq('status_aktif', true);
       final total = (totalRes as List).length;
       final selesaiRes = await c.from('status_tugas_siswa').select('id').eq('tugas_id', tugasId).eq('status', 'selesai');

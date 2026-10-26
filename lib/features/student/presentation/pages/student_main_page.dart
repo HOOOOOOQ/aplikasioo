@@ -155,7 +155,7 @@ class _StudentMainPageState extends ConsumerState<StudentMainPage> {
                         decoration: InputDecoration(contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
                         items: kelasList.map((k) => DropdownMenuItem(value: k.id, child: Text(k.namaKelas, style: const TextStyle(fontSize: 13)))).toList(),
                         onChanged: (v) {
-                          final k = kelasList.firstWhere((e) => e.id == v);
+                          final k = kelasList.firstWhere((e) => e.id == v, orElse: () => kelasList.first);
                           setState(() {
                             _selectedKelasId = v;
                             _selectedKelasNama = k.namaKelas;

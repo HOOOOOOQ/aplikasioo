@@ -57,6 +57,7 @@ class AppDateUtils {
     if (timeStr == null || timeStr.isEmpty) return null;
     try {
       final parts = timeStr.split(':');
+      if (parts.length < 2) return null;
       final h = int.tryParse(parts[0]) ?? 0;
       final m = int.tryParse(parts[1]) ?? 0;
       return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
