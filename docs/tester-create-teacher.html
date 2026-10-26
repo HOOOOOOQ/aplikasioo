@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>EduTask — Penguji create-teacher (browser)</title>
+<style>
+  :root { color-scheme: light dark; --brand:#0D47A1; --ok:#2E7D32; --bad:#C62828; --warn:#EF6C00; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 24px; background:#f5f7fb; color:#12203a; }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; color: var(--brand); }
+  p.sub { margin: 0 0 18px; color:#4a5b78; font-size: 13px; }
+  .card { background:#fff; border-radius: 14px; padding: 16px; box-shadow: 0 1px 3px rgba(16,32,64,.12); margin-bottom: 16px; }
+  label { display:block; font-size: 12px; font-weight: 600; margin: 10px 0 4px; color:#33415c; }
+  input[type=text], input[type=email], input[type=password] { width:100%; padding: 9px 10px; border:1px solid #cfd8e6; border-radius: 9px; font-size: 13px; }
+  .row { display:flex; gap:12px; flex-wrap: wrap; }
+  .row > div { flex: 1 1 240px; }
+  .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+  button { border:0; border-radius: 9px; padding: 10px 14px; font-size: 13px; font-weight:600; cursor:pointer; background:#e6ecf7; color:#12203a; }
+  button.primary { background: var(--brand); color:#fff; }
+  button:disabled { opacity:.5; cursor: not-allowed; }
+  .hint { font-size: 11px; color:#65728a; margin-top:6px; }
+  table { width:100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align:left; padding: 7px 8px; border-bottom: 1px solid #e6ebf3; vertical-align: top; }
+  th { color:#4a5b78; font-weight:600; font-size: 11.5px; text-transform: uppercase; letter-spacing:.03em; }
+  .pass { color: var(--ok); font-weight: 700; }
+  .fail { color: var(--bad); font-weight: 700; }
+  .skip { color:#8593ab; }
+  pre { background:#0f172a; color:#dbe6f5; padding: 12px; border-radius: 10px; overflow:auto; font-size: 12px; max-height: 300px; }
+  .warn { background:#fff4e5; border:1px solid #ffcc80; color:#7a4100; padding:10px 12px; border-radius:10px; font-size:12.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Penguji Edge Function <code>create-teacher</code></h1>
+  <p class="sub">Halaman ini hanya berjalan di browser Anda. Tidak ada kredensial yang dikirim ke server lain selain project Supabase Anda sendiri, dan tidak disimpan (tanpa localStorage).</p>
+
+  <div class="card">
+    <div class="row">
+      <div>
+        <label for="url">SUPABASE_URL</label>
+        <input id="url" type="text" placeholder="https://xxxx.supabase.co" autocomplete="off" />
+      </div>
+      <div>
+        <label for="anon">SUPABASE_ANON_KEY (publishable)</label>
+        <input id="anon" type="password" placeholder="eyJ... / sb_publishable_..." autocomplete="off" />
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label for="email">Email admin</label>
+        <input id="email" type="email" placeholder="admin@sekolah.id" autocomplete="off" />
+      </div>
+      <div>
+        <label for="pass">Password admin</label>
+        <input id="pass" type="password" placeholder="••••••" autocomplete="off" />
+      </div>
+    </div>
+    <div class="hint">Nilai URL & anon key harus sama dengan yang dipakai saat build APK.</div>
+
+    <div class="actions">
+      <button class="primary" id="runSafe">Jalankan tes aman (401 / login / profil)</button>
+      <button id="runForbidden">Uji non-admin (403)</button>
+      <button id="runInvite">Uji undang guru (membuat akun!)</button>
+    </div>
+    <div class="hint">Tombol “Uji non-admin” butuh email/password guru. Tombol “Uji undang guru” BENAR-BENAR membuat akun di database.</div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div>
+        <label for="gemail">Email guru non-admin (opsional)</label>
+        <input id="gemail" type="email" placeholder="guru@sekolah.id" autocomplete="off" />
+      </div>
+      <div>
+        <label for="gpass">Password guru non-admin (opsional)</label>
+        <input id="gpass" type="password" placeholder="••••••" autocomplete="off" />
+      </div>
+    </div>
+    <div class="warn" style="margin-top:12px">Jangan pakai halaman ini di komputer bersama. Tutup tab setelah selesai. Jangan menempelkan service_role key di sini — halaman ini tidak membutuhkannya.</div>
+  </div>
+
+  <div class="card">
+    <table id="results">
+      <thead><tr><th>Pemeriksaan</th><th>Harapan</th><th>Hasil</th><th>Detail</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <label style="margin-top:0">Log (token otomatis disamarkan)</label>
+    <pre id="log">Siap.</pre>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const resultsBody = $('results').querySelector('tbody');
+const logEl = $('log');
+let accessToken = null;
+
+function cfg() {
+  const url = $('url').value.trim().replace(/\/+$/, '');
+  const anon = $('anon').value.trim();
+  if (!url || !anon) throw new Error('SUPABASE_URL dan anon key wajib diisi.');
+  if (!/^https:\/\//.test(url)) throw new Error('SUPABASE_URL harus diawali https://');
+  return { url, anon };
+}
+
+function redact(value) {
+  const SECRET_KEYS = ['access_token', 'refresh_token', 'provider_token', 'provider_refresh_token', 'password', 'apikey'];
+  try {
+    const obj = typeof value === 'string' ? JSON.parse(value) : value;
+    if (obj && typeof obj === 'object') {
+      const clone = Array.isArray(obj) ? [...obj] : { ...obj };
+      for (const k of Object.keys(clone)) {
+        if (SECRET_KEYS.includes(k.toLowerCase())) clone[k] = '«disamarkan»';
+        else if (clone[k] && typeof clone[k] === 'object') clone[k] = JSON.parse(redact(clone[k]));
+      }
+      return JSON.stringify(clone);
+    }
+  } catch (_) { /* bukan JSON */ }
+  return String(value).slice(0, 500);
+}
+
+function log(line) {
+  const stamp = new Date().toLocaleTimeString('id-ID');
+  logEl.textContent += `\n[${stamp}] ${line}`;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function addRow(name, expected, actual, ok, detail = '') {
+  const tr = document.createElement('tr');
+  const cls = ok === true ? 'pass' : ok === false ? 'fail' : 'skip';
+  const label = ok === true ? 'LULUS' : ok === false ? 'GAGAL' : 'DILEWATI';
+  tr.innerHTML = `<td>${name}</td><td>${expected}</td><td class="${cls}">${label} (${actual})</td><td style="max-width:340px;word-break:break-word">${detail}</td>`;
+  resultsBody.appendChild(tr);
+}
+
+async function api(path, { method = 'GET', token = null, body = null, anon, url } = {}) {
+  const headers = { apikey: anon };
+  if (body !== null) headers['Content-Type'] = 'application/json';
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${url}${path}`, { method, headers, body: body === null ? undefined : JSON.stringify(body) });
+  const text = await res.text();
+  let data = text;
+  try { data = JSON.parse(text); } catch (_) {}
+  log(`${method} ${path.split('?')[0]} → HTTP ${res.status}`);
+  return { status: res.status, data };
+}
+
+async function signIn(email, password) {
+  const { url, anon } = cfg();
+  if (!email || !password) throw new Error('Email/password kosong.');
+  const r = await api('/auth/v1/token?grant_type=password', { method: 'POST', anon, url, body: { email, password } });
+  if (r.status !== 200 || !r.data?.access_token) {
+    const msg = r.data?.error_description || r.data?.msg || r.data?.error || 'login gagal';
+    throw new Error(`Login gagal (HTTP ${r.status}): ${msg}`);
+  }
+  return { token: r.data.access_token, userId: r.data.user?.id, email: r.data.user?.email };
+}
+
+async function invoke(token, payload) {
+  const { url, anon } = cfg();
+  return api('/functions/v1/create-teacher', { method: 'POST', token, body: payload, anon, url });
+}
+
+function busy(on) {
+  for (const b of document.querySelectorAll('button')) b.disabled = on;
+}
+
+async function testNoToken(anon, url) {
+  const r = await api('/functions/v1/create-teacher', { method: 'POST', anon, url, body: {} });
+  addRow('Request tanpa Authorization', '401', r.status, r.status === 401, redact(r.data).slice(0, 200));
+}
+
+async function testBadToken(anon, url) {
+  const r = await api('/functions/v1/create-teacher', { method: 'POST', anon, url, token: 'invalid.jwt.token', body: {} });
+  addRow('Request dengan token palsu', '401', r.status, r.status === 401, redact(r.data).slice(0, 200));
+}
+
+async function testProfile(anon, url) {
+  const r = await api(`/rest/v1/profiles?select=role,is_active&id=eq.${window.__uid}`, { anon, url, token: accessToken });
+  const row = Array.isArray(r.data) ? r.data[0] : null;
+  const ok = row?.role === 'admin' && row?.is_active === true;
+  addRow('Profil admin (role=admin, is_active=true)', 'true', `${ok}`, ok, row ? redact(row) : 'baris profiles tidak ditemukan');
+}
+
+$('runSafe').addEventListener('click', async () => {
+  busy(true); resultsBody.innerHTML = ''; accessToken = null;
+  try {
+    const { anon, url } = cfg();
+    await testNoToken(anon, url);
+    await testBadToken(anon, url);
+    const s = await signIn($('email').value.trim(), $('pass').value.trim());
+    accessToken = s.token; window.__uid = s.userId;
+    addRow('Login admin', '200', 200, true, s.email || '');
+    await testProfile(anon, url);
+    log('Tes aman selesai. Token tidak disimpan.');
+  } catch (e) {
+    addRow('Login admin', '200', '-', false, e.message);
+    log(`Error: ${e.message}`);
+  } finally { busy(false); }
+});
+
+$('runForbidden').addEventListener('click', async () => {
+  busy(true);
+  try {
+    const { anon, url } = cfg();
+    const g = await signIn($('gemail').value.trim(), $('gpass').value.trim());
+    const r = await invoke(g.token, { email: 'x@example.com', password: '123456', full_name: 'Tes Non Admin' });
+    const ok = r.status === 403;
+    addRow('Guru non-admin mencoba undang guru', '403', r.status, ok, redact(r.data).slice(0, 240));
+    if (r.status === 401) log('401 untuk user valid biasanya berarti function memakai service_role dari project lain.');
+  } catch (e) {
+    addRow('Guru non-admin mencoba undang guru', '403', '-', false, e.message);
+  } finally { busy(false); }
+});
+
+$('runInvite').addEventListener('click', async () => {
+  if (!confirm('Ini akan MEMBUAT akun guru baru di database. Lanjutkan?')) return;
+  busy(true);
+  try {
+    const { anon, url } = cfg();
+    if (!accessToken) {
+      const s = await signIn($('email').value.trim(), $('pass').value.trim());
+      accessToken = s.token; window.__uid = s.userId;
+    }
+    const stamp = Date.now().toString(36);
+    const payload = { email: `guru.uji.${stamp}@example.com`, password: 'UjiCoba123!', full_name: 'Guru Uji Browser' };
+    const r = await invoke(accessToken, payload);
+    const ok = r.status === 200;
+    addRow('Admin mengundang guru', '200', r.status, ok, `${redact(r.data).slice(0, 200)}${ok ? ` — akun: ${payload.email}` : ''}`);
+    if (ok) log('Akun uji dibuat. Hapus di Dashboard → Authentication → Users setelah selesai.');
+  } catch (e) {
+    addRow('Admin mengundang guru', '200', '-', false, e.message);
+  } finally { busy(false); }
+});
+</script>
+</body>
+</html>
