@@ -134,15 +134,70 @@ jobs:
           done
           ls -lh dist
 
+      # AGP kadang tidak menulis skema v1 walau diminta (mis. device/keystore tertentu).
+      # Karena minSdk 21 WAJIB punya v1 agar bisa diparse Android 5/6, APK di-
+      # zipalign + di-sign ulang di sini dengan flag eksplisit.
+      - name: Re-sign APK dengan v1+v2+v3 (deterministik)
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/Android/Sdk}}"
+          BUILD_TOOLS=$(ls -d "$SDK"/build-tools/* 2>/dev/null | sort -V | tail -1)
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+          ZIPALIGN="$BUILD_TOOLS/zipalign"
+
+          if [ -f android/key.properties ]; then
+            KS_PATH=$(grep -E '^storeFile=' android/key.properties | head -1 | cut -d= -f2-)
+            KS_PASS=$(grep -E '^storePassword=' android/key.properties | head -1 | cut -d= -f2-)
+            KS_ALIAS=$(grep -E '^keyAlias=' android/key.properties | head -1 | cut -d= -f2-)
+            KEY_PASS=$(grep -E '^keyPassword=' android/key.properties | head -1 | cut -d= -f2-)
+            KS_TYPE=$(grep -E '^storeType=' android/key.properties | head -1 | cut -d= -f2- || echo JKS)
+            KS_FILE="android/app/${KS_PATH}"
+          else
+            KS_FILE="android/app/edutask-signing.p12"
+            KS_PASS="edutask2026"
+            KS_ALIAS="edutask"
+            KEY_PASS="edutask2026"
+            KS_TYPE="PKCS12"
+          fi
+
+          # PKCS12 buatan OpenSSL bisa memakai algoritma legacy; konversi ke JKS
+          # supaya apksigner (JDK 17) paling kompatibel. Jika gagal, pakai aslinya.
+          if [ "$KS_TYPE" = "PKCS12" ]; then
+            if keytool -importkeystore -noprompt \
+                 -srckeystore "$KS_FILE" -srcstoretype PKCS12 -srcstorepass "$KS_PASS" -srcalias "$KS_ALIAS" \
+                 -destkeystore /tmp/resign.jks -deststoretype JKS -deststorepass "$KS_PASS" \
+                 -destalias "$KS_ALIAS" -destkeypass "$KEY_PASS" > /tmp/keytool.log 2>&1; then
+              echo "Keystore dikonversi ke JKS untuk signing."
+              KS_FILE=/tmp/resign.jks
+              KS_TYPE=JKS
+            else
+              echo "::warning::Konversi JKS gagal, memakai PKCS12 langsung."
+              tail -5 /tmp/keytool.log || true
+            fi
+          fi
+
+          for apk in dist/*.apk; do
+            echo "Re-sign: $apk"
+            "$ZIPALIGN" -f -p 4 "$apk" "/tmp/aligned.apk"
+            "$APKSIGNER" sign               --ks "$KS_FILE" --ks-type "$KS_TYPE" --ks-pass "pass:${KS_PASS}"               --ks-key-alias "$KS_ALIAS" --key-pass "pass:${KEY_PASS}"               --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true               --out "$apk" /tmp/aligned.apk
+            "$APKSIGNER" verify --verbose "$apk" | grep -E "^Verified using v[123] scheme"
+          done
+
       # ===== VALIDASI APK: bukti bahwa file benar-benar APK yang sah =====
       - name: Validasi APK (integritas, manifest, signature, aligment)
         run: |
           set -euo pipefail
-          BUILD_TOOLS=$(ls -d "$ANDROID_SDK_ROOT"/build-tools/* | sort -V | tail -1)
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/Android/Sdk}}"
+          echo "SDK=$SDK"
+          BUILD_TOOLS=$(ls -d "$SDK"/build-tools/* 2>/dev/null | sort -V | tail -1)
           echo "BUILD_TOOLS=$BUILD_TOOLS"
           AAPT="$BUILD_TOOLS/aapt"
+          [ -x "$AAPT" ] || AAPT="$BUILD_TOOLS/aapt2"
           APKSIGNER="$BUILD_TOOLS/apksigner"
           ZIPALIGN="$BUILD_TOOLS/zipalign"
+          for tool in "$AAPT" "$APKSIGNER" "$ZIPALIGN"; do
+            [ -x "$tool" ] || { echo "::error::tool tidak ditemukan: $tool"; exit 1; }
+          done
           FAIL=0
 
           for apk in dist/*.apk; do
@@ -160,7 +215,7 @@ jobs:
             # 2) AndroidManifest bisa diparse + package/sdk benar
             "$AAPT" dump badging "$apk" > /tmp/badging.txt 2>&1 || { echo "::error::aapt gagal membaca $apk"; cat /tmp/badging.txt; FAIL=1; continue; }
             head -1 /tmp/badging.txt
-            PKG=$(grep -m1 "^package:" /tmp/badging.txt | sed "s/.*name='\([^']*\)'.*/\1/")
+            PKG=$(grep -m1 "^package: name=" /tmp/badging.txt | sed -E "s/^package: name='([^']+)'.*/\1/")
             echo "package=$PKG"
             grep -m1 "sdkVersion" /tmp/badging.txt || true
             grep -m1 "targetSdkVersion" /tmp/badging.txt || true
@@ -174,10 +229,12 @@ jobs:
             "$APKSIGNER" verify --verbose --print-certs "$apk" > /tmp/sign.txt 2>&1 || { echo "::error::signature TIDAK valid: $apk"; cat /tmp/sign.txt; FAIL=1; continue; }
             grep -E "^Verified using" /tmp/sign.txt
             grep -E "Signer #1 certificate SHA-256" /tmp/sign.txt || true
-            if ! grep -q "v1 scheme (JAR signing): true" /tmp/sign.txt; then
+            if ! grep -qE "v1 scheme \(JAR signing\): true" /tmp/sign.txt; then
               echo "::error::$apk tidak punya signature v1 (akan gagal diinstal di Android 5/6)"
+              cat /tmp/sign.txt
               FAIL=1
             fi
+            grep -qE "v2 scheme .*: true" /tmp/sign.txt || { echo "::error::$apk tanpa signature v2"; FAIL=1; }
 
             # 4) zipalign (4-byte)
             if ! "$ZIPALIGN" -c -v 4 "$apk" > /tmp/align.txt 2>&1; then
@@ -194,6 +251,43 @@ jobs:
           echo "================ RINGKASAN ================"
           ls -l dist
           cat SHA256SUMS.txt
+
+      - name: Laporan validasi (job summary + komentar PR)
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -uo pipefail
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/Android/Sdk}}"
+          BUILD_TOOLS=$(ls -d "$SDK"/build-tools/* 2>/dev/null | sort -V | tail -1)
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+          AAPT="$BUILD_TOOLS/aapt"; [ -x "$AAPT" ] || AAPT="$BUILD_TOOLS/aapt2"
+          {
+            echo "### Validasi APK — build #${GITHUB_RUN_NUMBER}"
+            echo ""
+            echo "| File | Ukuran | SHA-256 (potong) |"
+            echo "|---|---|---|"
+            for apk in dist/*.apk; do
+              [ -f "$apk" ] || continue
+              echo "| $(basename "$apk") | $(du -h "$apk" | cut -f1) | \`$(sha256sum "$apk" | cut -c1-32)…\` |"
+            done
+            for apk in dist/*.apk; do
+              [ -f "$apk" ] || continue
+              echo ""
+              echo "<details><summary>$(basename "$apk")</summary>"
+              echo ""
+              echo '```'
+              "$AAPT" dump badging "$apk" 2>&1 | grep -E "^(package|sdkVersion|targetSdkVersion|native-code|launchable-activity)" || true
+              "$APKSIGNER" verify --verbose --print-certs "$apk" 2>&1 | grep -E "^(Verifies|Verified using|Signer #1 certificate (DN|SHA-256))" || true
+              echo '```'
+              echo "</details>"
+            done
+          } > validation.md 2>&1
+          cat validation.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "${PR_NUMBER:-}" ]; then
+            gh pr comment "$PR_NUMBER" --body-file validation.md || echo "gagal kirim komentar (diabaikan)"
+          fi
 
       - name: Tulis catatan rilis
         if: success()

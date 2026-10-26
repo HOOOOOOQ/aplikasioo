@@ -112,6 +112,8 @@ Dashboard → **New Project** → nama `EduTask` → catat **Project URL** (`htt
 
 ### 2. Jalankan SQL Migration
 Supabase → **SQL Editor** → **New query** → copy-paste `supabase/migrations/001_initial_schema.sql` → **Run**.  
+Setelah Edge Function siswa dideploy, jalankan juga `supabase/migrations/002_security_hardening.sql`
+(menutup kebocoran kolom `kode_akses` untuk anon).  
 Isinya: 8+ tabel (`profiles`, `siswa`, `kelas`, `mata_pelajaran`, `guru_mapel`, `jadwal_pelajaran`, `tugas`, `status_tugas_siswa`) + FK/Index/Constraint + trigger anti-duplikat & anti-bentrok jadwal.
 
 ### 3. Storage Bucket
@@ -140,6 +142,12 @@ supabase functions deploy create-teacher
 supabase functions deploy student-access
 supabase functions deploy update-student-task-status
 ```
+
+> **Penting (keamanan):** `student-access` menerbitkan token **bertanda tangan HMAC-SHA256**
+> dan `update-student-task-status` **mewajibkan** token tersebut. Versi lama memakai token
+> base64 yang bisa dipalsukan dan melewati validasi bila token kosong. Deploy **kedua**
+> function bersamaan. Secret opsional `STUDENT_TOKEN_SECRET` (jika tidak diisi, dipakai
+> `SUPABASE_SERVICE_ROLE_KEY`).
 
 `supabase/config.toml` sudah menetapkan `verify_jwt` per function, jadi **tidak perlu** flag
 `--no-verify-jwt` untuk `create-teacher`. Jika project ini sebelumnya men-deploy dengan
@@ -253,8 +261,16 @@ Langkah CI (Ubuntu, Java 17, Flutter stable 3.35.4, Gradle 8.13):
 6. `flutter build apk --release` — plus `with --dart-define` job bila Secrets `SUPABASE_URL`/`SUPABASE_ANON_KEY` ada
 7. `upload-artifact` — `edutask-release-apk` (`build/app/outputs/flutter-apk/app-release.apk`, ~29MB) + `build-log`
 
-**Download APK:**
-Repo → **Actions** → workflow **Build EduTask APK** hijau → **Artifacts** → `edutask-release-apk` → unzip → `app-release.apk` → install di Android (izinkan *Install from unknown sources* untuk Chrome/Files).
+**Download APK (disarankan):**
+Repo → **Releases** → tag **`latest-apk`** → unduh file `.apk` **langsung** (bukan zip):
+- `EduTask-<versi>-arm64-v8a.apk` — hampir semua HP modern, paling kecil & disarankan
+- `EduTask-<versi>-armeabi-v7a.apk` — HP 32-bit lama
+- `EduTask-<versi>-universal.apk` — semua ABI dalam satu file
+
+Setiap rilis menyertakan `SHA256SUMS.txt`. Jika sebelumnya terpasang build dengan tanda
+tangan berbeda, uninstall dulu. Panduan lengkap: [`docs/apk-install-troubleshooting.md`](docs/apk-install-troubleshooting.md).
+
+**Alternatif (Actions artifact):** Actions → **Build EduTask APK** hijau → **Artifacts** → `edutask-apks` → unzip → pilih `.apk`.
 
 **Build lokal:**
 ```bash
@@ -264,8 +280,13 @@ flutter build apk --release --dart-define=SUPABASE_URL=... --dart-define=SUPABAS
 # hasil: build/app/outputs/flutter-apk/app-release.apk
 ```
 
-**Signing release (Play Store):**
-Jangan commit keystore. Buat lokal:
+**Signing release:**
+Build CI ditandatangani `android/app/edutask-signing.p12` — **keystore test** yang di-commit
+supaya signature antar build stabil (APK baru bisa menimpa APK lama). Untuk Play Store atau
+kunci privat, set Secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
+`ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`; workflow akan memakainya otomatis.
+
+**Membuat keystore sendiri (Play Store):**
 ```bash
 keytool -genkey -v -keystore upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
 ```
