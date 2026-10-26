@@ -68,7 +68,8 @@ void main() {
         parentTabFor('/siswa/tugas/9/diskusi', const ['/siswa', '/siswa/tugas', '/siswa/tugas/9']),
         '/siswa/tugas/9',
       );
-      expect(parentTabFor('/guru/profil', const ['/guru', '/guru/tugas']), isNull);
+      expect(parentTabFor('/guru/profil', const ['/guru/tugas']), isNull);
+      expect(parentTabFor('/guru/profil', const ['/guru', '/guru/tugas']), '/guru');
     });
   });
 

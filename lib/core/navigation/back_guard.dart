@@ -131,8 +131,15 @@ class AppBackGuard extends StatefulWidget {
 }
 
 class _AppBackGuardState extends State<AppBackGuard> {
-  /// Mencegah dua handler berjalan bersamaan (mis. double-tap Back).
-  bool _handling = false;
+  /// Waktu aksi Back terakhir. Dipakai sebagai latch 250 ms agar double-tap
+  /// tidak memicu dua aksi — tanpa timer yang bisa tertinggal setelah dispose.
+  DateTime? _lastActionAt;
+
+  bool get _coolingDown {
+    final last = _lastActionAt;
+    if (last == null) return false;
+    return DateTime.now().difference(last) < const Duration(milliseconds: 250);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -161,34 +168,29 @@ class _AppBackGuardState extends State<AppBackGuard> {
   }
 
   Future<void> _handle(BackAction action) async {
-    if (_handling) return;
-    _handling = true;
-    try {
-      final router = GoRouter.of(context);
-      switch (action.kind) {
-        case BackActionKind.popRoute:
-          router.pop();
-        case BackActionKind.goTo:
-          router.go(action.route!);
-        case BackActionKind.exitApp:
-          _exit();
-        case BackActionKind.confirmExit:
-          final confirmed = widget.confirmExit != null
-              ? await widget.confirmExit!(context)
-              : await showConfirmDialog(
-                  context,
-                  title: widget.exitTitle,
-                  content: widget.exitMessage,
-                  confirmLabel: 'Keluar',
-                  cancelLabel: 'Tetap di aplikasi',
-                );
-          if (!confirmed || !mounted) return;
-          _exit();
-      }
-    } finally {
-      // Beri jeda singkat agar tap ganda tidak memicu dua aksi.
-      await Future<void>.delayed(const Duration(milliseconds: 250));
-      _handling = false;
+    if (_coolingDown) return;
+    _lastActionAt = DateTime.now();
+
+    final router = GoRouter.of(context);
+    switch (action.kind) {
+      case BackActionKind.popRoute:
+        router.pop();
+      case BackActionKind.goTo:
+        router.go(action.route!);
+      case BackActionKind.exitApp:
+        _exit();
+      case BackActionKind.confirmExit:
+        final confirmed = widget.confirmExit != null
+            ? await widget.confirmExit!(context)
+            : await showConfirmDialog(
+                context,
+                title: widget.exitTitle,
+                content: widget.exitMessage,
+                confirmLabel: 'Keluar',
+                cancelLabel: 'Tetap di aplikasi',
+              );
+        if (!confirmed || !mounted) return;
+        _exit();
     }
   }
 
