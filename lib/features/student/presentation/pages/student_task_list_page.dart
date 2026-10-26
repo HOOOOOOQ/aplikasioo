@@ -15,6 +15,7 @@ import '../../../../shared/repositories/tugas_repository.dart';
 import '../../../../shared/models/mata_pelajaran.dart';
 import '../../../../core/config/supabase_config.dart';
 import '../../identity/student_identity_provider.dart';
+import 'student_main_page.dart';
 
 class StudentTaskListPage extends ConsumerStatefulWidget {
   const StudentTaskListPage({super.key});
@@ -78,27 +79,31 @@ class _StudentTaskListPageState extends ConsumerState<StudentTaskListPage> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                FutureBuilder(
-                  future: _safeKelas(),
-                  builder: (ctx, snap) {
-                    if (snap.connectionState == ConnectionState.waiting) return const SizedBox(height: 20, child: LinearProgressIndicator());
-                    final list = snap.data ?? [];
-                    if (list.isEmpty) {
-                      if (SupabaseConfig.isNotConfigured) {
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 6),
-                          child: Text('Mode demo — pilih kelas akan aktif setelah Supabase dikonfigurasi', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                // FIX: provider — tanpa FutureBuilder yang recreate future tiap build + tanpa addPostFrameCallback di build
+                Consumer(
+                  builder: (ctx, ref, _) {
+                    final kelasAsync = ref.watch(kelasListProvider);
+                    return kelasAsync.when(
+                      loading: () => const SizedBox(height: 20, child: LinearProgressIndicator()),
+                      error: (_, __) => const SizedBox(),
+                      data: (list) {
+                        if (list.isEmpty) {
+                          if (SupabaseConfig.isNotConfigured) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 6),
+                              child: Text('Mode demo — pilih kelas akan aktif setelah Supabase dikonfigurasi', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                            );
+                          }
+                          return const SizedBox();
+                        }
+                        final effectiveId = _kelasId ?? list.first.id;
+                        return DropdownButtonFormField<String>(
+                          value: effectiveId,
+                          decoration: InputDecoration(prefixIcon: const Icon(Icons.class_outlined, size: 18), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                          items: list.map((k) => DropdownMenuItem(value: k.id, child: Text(k.namaKelas, style: const TextStyle(fontSize: 13)))).toList(),
+                          onChanged: (v) => setState(() => _kelasId = v),
                         );
-                      }
-                      return const SizedBox();
-                    }
-                    final val = _kelasId ?? list.first.id;
-                    if (_kelasId == null) WidgetsBinding.instance.addPostFrameCallback((_) => setState(() => _kelasId = val));
-                    return DropdownButtonFormField<String>(
-                      value: _kelasId ?? val,
-                      decoration: InputDecoration(prefixIcon: const Icon(Icons.class_outlined, size: 18), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-                      items: list.map((k) => DropdownMenuItem(value: k.id, child: Text(k.namaKelas, style: const TextStyle(fontSize: 13)))).toList(),
-                      onChanged: (v) => setState(() => _kelasId = v),
+                      },
                     );
                   },
                 ),
@@ -178,15 +183,6 @@ class _StudentTaskListPageState extends ConsumerState<StudentTaskListPage> {
         ],
       ),
     );
-  }
-
-  Future<List<Kelas>> _safeKelas() async {
-    if (SupabaseConfig.isNotConfigured) return <Kelas>[];
-    try {
-      return await KelasRepository().fetchAll();
-    } catch (_) {
-      return <Kelas>[];
-    }
   }
 
   Future<List<MataPelajaran>> _safeMapel() async {

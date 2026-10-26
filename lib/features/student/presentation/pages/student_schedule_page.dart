@@ -11,6 +11,7 @@ import '../../../../shared/repositories/jadwal_repository.dart';
 import '../../../../shared/models/jadwal.dart';
 import '../../../../core/config/supabase_config.dart';
 import '../../identity/student_identity_provider.dart';
+import 'student_main_page.dart';
 
 class StudentSchedulePage extends ConsumerStatefulWidget {
   const StudentSchedulePage({super.key});
@@ -44,32 +45,34 @@ class _StudentSchedulePageState extends ConsumerState<StudentSchedulePage> {
       ),
       body: Column(
         children: [
-          // Kelas selector — guarded for demo mode
-          FutureBuilder(
-            future: _safeKelas(),
-            builder: (ctx, snap) {
-              if (snap.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
-              if (snap.hasError) return const SizedBox();
-              final list = snap.data ?? [];
-              if (list.isEmpty) {
-                if (SupabaseConfig.isNotConfigured) {
-                  return const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: Text('Mode demo: data kelas akan muncul setelah Supabase dikonfigurasi', style: TextStyle(fontSize: 12, color: AppColors.textSecondary), textAlign: TextAlign.center),
+          // FIX: kelas dipindah ke Riverpod provider — jangan buat Future baru tiap build + jangan setState di dalam build
+          Consumer(
+            builder: (ctx, ref, _) {
+              final kelasAsync = ref.watch(kelasListProvider);
+              return kelasAsync.when(
+                loading: () => const LinearProgressIndicator(),
+                error: (_, __) => const SizedBox(),
+                data: (list) {
+                  if (list.isEmpty) {
+                    if (SupabaseConfig.isNotConfigured) {
+                      return const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: Text('Mode demo: data kelas akan muncul setelah Supabase dikonfigurasi', style: TextStyle(fontSize: 12, color: AppColors.textSecondary), textAlign: TextAlign.center),
+                      );
+                    }
+                    return const SizedBox();
+                  }
+                  final effectiveId = _kelasId ?? list.first.id;
+                  return Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: DropdownButtonFormField<String>(
+                      value: effectiveId,
+                      decoration: InputDecoration(prefixIcon: const Icon(Icons.class_outlined), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                      items: list.map((k) => DropdownMenuItem(value: k.id, child: Text(k.namaKelas))).toList(),
+                      onChanged: (v) => setState(() => _kelasId = v),
+                    ),
                   );
-                }
-                return const SizedBox();
-              }
-              final val = _kelasId ?? list.first.id;
-              if (_kelasId == null) WidgetsBinding.instance.addPostFrameCallback((_) => setState(() => _kelasId = val));
-              return Padding(
-                padding: const EdgeInsets.all(12),
-                child: DropdownButtonFormField<String>(
-                  value: _kelasId ?? val,
-                  decoration: InputDecoration(prefixIcon: const Icon(Icons.class_outlined), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-                  items: list.map((k) => DropdownMenuItem(value: k.id, child: Text(k.namaKelas))).toList(),
-                  onChanged: (v) => setState(() => _kelasId = v),
-                ),
+                },
               );
             },
           ),
@@ -152,15 +155,6 @@ class _StudentSchedulePageState extends ConsumerState<StudentSchedulePage> {
         ],
       ),
     );
-  }
-
-  Future<List<Kelas>> _safeKelas() async {
-    if (SupabaseConfig.isNotConfigured) return <Kelas>[];
-    try {
-      return await KelasRepository().fetchAll();
-    } catch (_) {
-      return <Kelas>[];
-    }
   }
 
   Future<List<Jadwal>> _fetchJadwal(String kelasId, String hariIni, String besok) async {
