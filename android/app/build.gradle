@@ -68,9 +68,8 @@ android {
                 keyPassword 'edutask2026'
                 storeType 'PKCS12'
             }
-            // Semua skema tanda tangan aktif: APK tetap bisa diparse/diinstal
-            // di Android 5 (v1) sampai Android 14+ (v2/v3). Ini yang mencegah
-            // "Ada masalah saat mengurai paket" pada perangkat lama.
+            // Semua skema tanda tangan diaktifkan. Dengan minSdk 24, Android memakai
+            // v2/v3; v1 tetap diminta agar APK kompatibel bila minSdk diturunkan kelak.
             enableV1Signing true
             enableV2Signing true
             enableV3Signing true
@@ -79,7 +78,10 @@ android {
 
     defaultConfig {
         applicationId "com.edutask.sekolah"
-        minSdk 21
+        // Flutter 3.35 menetapkan flutter.minSdkVersion = 24 dan MENIMPA nilai < 24.
+        // Karena itu ditulis eksplisit 24 (Android 7.0) agar benar-benar sesuai APK.
+        // Konsekuensi: perangkat Android 5/6 (API 21-23) TIDAK didukung.
+        minSdk 24
         targetSdk 36
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
@@ -98,9 +100,8 @@ android {
         }
     }
 
-    // Catatan: JANGAN memaksa `jniLibs.useLegacyPackaging = false`.
-    // Dengan minSdk 21, AGP menulis extractNativeLibs=false yang tidak didukung
-    // Android 5/6 sehingga APK bisa gagal dipasang/dijalankan di perangkat lama.
+    // Catatan: JANGAN memaksa `jniLibs.useLegacyPackaging`; biarkan AGP memilih
+    // sesuai minSdk agar konfigurasi packaging tetap kompatibel.
 }
 
 flutter {

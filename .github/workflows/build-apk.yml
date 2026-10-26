@@ -229,12 +229,16 @@ jobs:
             "$APKSIGNER" verify --verbose --print-certs "$apk" > /tmp/sign.txt 2>&1 || { echo "::error::signature TIDAK valid: $apk"; cat /tmp/sign.txt; FAIL=1; continue; }
             grep -E "^Verified using" /tmp/sign.txt
             grep -E "Signer #1 certificate SHA-256" /tmp/sign.txt || true
-            if ! grep -qE "v1 scheme \(JAR signing\): true" /tmp/sign.txt; then
-              echo "::error::$apk tidak punya signature v1 (akan gagal diinstal di Android 5/6)"
-              cat /tmp/sign.txt
-              FAIL=1
+            MIN_SDK=$(grep -m1 "sdkVersion:" /tmp/badging.txt | sed -E "s/.*sdkVersion:'([0-9]+)'.*/\1/")
+            echo "minSdk dari manifest = $MIN_SDK"
+            if [ "${MIN_SDK:-0}" -lt 24 ]; then
+              # Hanya Android 7 ke bawah yang butuh v1.
+              grep -qE "v1 scheme \(JAR signing\): true" /tmp/sign.txt || {
+                echo "::error::$apk minSdk=$MIN_SDK tetapi tidak punya v1 signature"; FAIL=1; }
             fi
             grep -qE "v2 scheme .*: true" /tmp/sign.txt || { echo "::error::$apk tanpa signature v2"; FAIL=1; }
+            grep -qE "Signer #1 certificate DN: .*EduTask" /tmp/sign.txt || {
+              echo "::warning::Sertifikat bukan keystore EduTask — cek android/key.properties / secret ANDROID_KEYSTORE_BASE64"; }
 
             # 4) zipalign (4-byte)
             if ! "$ZIPALIGN" -c -v 4 "$apk" > /tmp/align.txt 2>&1; then
@@ -279,7 +283,7 @@ jobs:
               echo ""
               echo '```'
               "$AAPT" dump badging "$apk" 2>&1 | grep -E "^(package|sdkVersion|targetSdkVersion|native-code|launchable-activity)" || true
-              "$APKSIGNER" verify --verbose --print-certs "$apk" 2>&1 | grep -E "^(Verifies|Verified using|Signer #1 certificate (DN|SHA-256))" || true
+              "$APKSIGNER" verify --verbose --print-certs "$apk" 2>&1 | head -40 || true
               echo '```'
               echo "</details>"
             done

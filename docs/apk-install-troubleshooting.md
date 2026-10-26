@@ -23,9 +23,11 @@ Perbaikan: release sekarang memakai keystore **stabil** `android/app/edutask-sig
 (dapat ditimpa lewat `android/key.properties` atau secret `ANDROID_KEYSTORE_BASE64`).
 Semua build berikutnya bisa menimpa build sebelumnya tanpa uninstall.
 
-### B. Skema tanda tangan tidak eksplisit
-`minSdk 21` berarti APK harus punya **v1 (JAR) signature** agar bisa diparse Android 5/6.
-Sekarang `enableV1Signing/V2Signing/V3Signing = true` untuk build release.
+### B. Skema tanda tangan & minSdk
+Flutter 3.35 **memaksa `flutter.minSdkVersion = 24`** dan menimpa nilai di bawahnya, jadi APK
+ini adalah **Android 7.0 (API 24)+**. Karena itu v1 (JAR) signature tidak wajib — Android 7+
+memverifikasi lewat **v2/v3**. Build tetap mengaktifkan ketiga skema; validasi CI mewajibkan
+v2 dan hanya mewajibkan v1 jika `minSdk < 24`.
 
 ### C. `jniLibs.useLegacyPackaging=false` dipaksa pada minSdk 21
 AGP menulis `android:extractNativeLibs="false"` yang tidak dikenal di Android 5/6.
@@ -67,7 +69,7 @@ unduh ulang.
 | "Ada masalah saat mengurai paket" saat file dibuka | File bukan APK (ZIP/rusak) | Unduh `.apk` dari Release, cek SHA-256 |
 | "App not installed" / "paket bentrok" setelah memilih Install | Signature berbeda dari app yang sudah terpasang | Uninstall app lama, pasang ulang |
 | "Aplikasi tidak mendukung perangkat ini" | ABI tidak cocok (mis. memasang arm64 di HP 32-bit) | Pakai `armeabi-v7a` atau `universal` |
-| "Your device is not compatible" / SDK | Android < 5.0 | Tidak didukung (minSdk 21) |
+| "Your device is not compatible" / "Ada masalah saat mengurai paket" | Android 5–6 (API 21–23) | **Tidak didukung** — aplikasi butuh Android 7.0+ (Flutter 3.35) |
 | Berhasil install tapi langsung tertutup | Crash runtime | Kirim `adb logcat -d \| grep -A30 "FATAL EXCEPTION"` |
 
 ---
@@ -77,7 +79,7 @@ unduh ulang.
 Workflow **Build EduTask APK** menjalankan, untuk setiap APK:
 
 - `unzip -t` → integritas ZIP/APK
-- `aapt dump badging` → package `com.edutask.sekolah`, `sdkVersion`, `targetSdkVersion`, `native-code`
+- `aapt dump badging` → package `com.edutask.sekolah`, `sdkVersion` (24), `targetSdkVersion`, `native-code`
 - `apksigner verify --verbose --print-certs` → memastikan **v1/v2/v3 valid** (build gagal kalau tidak)
 - `zipalign -c -v 4` → alignment
 - `sha256sum` → checksum yang dipublikasikan
