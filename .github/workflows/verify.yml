@@ -1,0 +1,39 @@
+name: Verify Flutter (analyze + test)
+
+# Gate yang benar-benar gagal bila ada error analyzer atau unit test gagal.
+# Workflow build APK tetap ada; workflow ini melengkapinya agar regresi Dart
+# (termasuk file test) tidak lolos diam-diam.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter 3.35.4
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.4'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Info/warning lama di repo tidak memblokir; ERROR analyzer tetap gagal.
+      - name: Analyze (fatal on errors)
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Unit & widget tests
+        run: flutter test
