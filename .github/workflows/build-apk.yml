@@ -400,53 +400,59 @@ jobs:
           ls -l /dev/kvm
 
       - name: Install APK di emulator + cold start + cek crash
+        id: smoke
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
           target: google_apis
           arch: x86_64
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-boot-timeout: 900
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
           script: |
-            set -e
-            APK=$(ls dist/*universal.apk | head -1)
-            echo "Menguji: $APK"
-            adb install -r "$APK"
-            adb shell pm list packages | grep com.edutask.sekolah
-            adb logcat -c
-            adb shell am start -W -n com.edutask.sekolah/.MainActivity | tee start.txt
-            grep -q "Status: ok" start.txt
-            sleep 15
-            adb shell dumpsys activity activities | grep -m1 "mResumedActivity" || true
-            adb logcat -d > logcat.txt || true
-            if grep -q "FATAL EXCEPTION" logcat.txt; then
-              echo "::error::Aplikasi crash saat start"
-              grep -B2 -A25 "FATAL EXCEPTION" logcat.txt
-              exit 1
-            fi
-            if ! adb shell pidof com.edutask.sekolah; then
-              echo "::error::Proses aplikasi tidak berjalan setelah start"
-              exit 1
-            fi
-            adb shell input keyevent 3
-            sleep 2
-            adb shell monkey -p com.edutask.sekolah -c android.intent.category.LAUNCHER 1 || true
-            sleep 5
-            adb logcat -d > logcat2.txt || true
-            if grep -q "FATAL EXCEPTION" logcat2.txt; then
-              echo "::error::Crash setelah relaunch"
-              grep -B2 -A25 "FATAL EXCEPTION" logcat2.txt
-              exit 1
-            fi
-            echo "APK berhasil diinstal, dibuka, dan tidak crash."
+            set -o pipefail
+            bash scripts/ci/emulator-smoke.sh 2>&1 | tee emulator-smoke.log
 
-      - name: Upload logcat
+      - name: Publikasikan log smoke test ke PR
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -uo pipefail
+          {
+            echo "### Uji instalasi di emulator — build #${GITHUB_RUN_NUMBER}"
+            echo ""
+            echo "Status langkah: **${{ steps.smoke.outcome }}**"
+            echo ""
+            if [ -f emulator-smoke.log ]; then
+              echo '```'
+              tail -c 6000 emulator-smoke.log
+              echo '```'
+            else
+              echo "_Log smoke test tidak dihasilkan (emulator gagal boot / action gagal sebelum skrip)._"
+            fi
+            if [ -f /tmp/logcat.txt ]; then
+              echo ""
+              echo "<details><summary>logcat (tail)</summary>"
+              echo ""
+              echo '```'
+              tail -c 4000 /tmp/logcat.txt
+              echo '```'
+              echo "</details>"
+            fi
+          } > emulator-report.md 2>&1
+          cat emulator-report.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "${PR_NUMBER:-}" ]; then
+            gh pr comment "$PR_NUMBER" --body-file emulator-report.md || echo "komentar gagal (diabaikan)"
+          fi
+
+      - name: Upload log smoke test
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: emulator-logcat
+          name: emulator-smoke-log
           path: |
-            logcat.txt
-            logcat2.txt
-            start.txt
+            emulator-smoke.log
+            emulator-report.md
           if-no-files-found: warn
