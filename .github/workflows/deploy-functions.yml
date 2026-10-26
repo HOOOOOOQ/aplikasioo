@@ -18,6 +18,7 @@ on:
         options:
           - create-teacher
           - student-access
+          - student-codes
           - update-student-task-status
           - all
 

@@ -26,11 +26,16 @@ class AppConstants {
   ];
 
   // Student identity
+  // Catatan keamanan: kode akses TIDAK disimpan di perangkat. Yang disimpan
+  // hanya identitas siswa + token bertanda tangan dari server.
   static const String spStudentIdKey = 'student_identity_id';
-  static const String spStudentCodeKey = 'student_identity_code';
+  static const String spStudentNameKey = 'student_identity_name';
+  static const String spStudentKelasNamaKey = 'student_identity_kelas_nama';
+  static const String spStudentVerifiedAtKey = 'student_identity_verified_at';
   static const String spStudentTokenKey = 'student_access_token';
   static const String spSelectedKelasId = 'selected_kelas_id';
   static const String spThemeMode = 'theme_mode';
+  static const String spNotificationsEnabled = 'notifications_enabled';
 
   // Date formats
   static const String dateFormatDisplay = 'dd MMMM yyyy';

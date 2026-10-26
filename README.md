@@ -1,4 +1,14 @@
-# APK EduTask gagal dipasang — "Ada masalah saat mengurai paket"
+# EduTask
+
+Aplikasi tugas & jadwal sekolah (Flutter + Supabase).
+
+> **Ronde 2 (v1.1.0):** perbaikan akar masalah Storage 403, sistem kode akses siswa
+> server-side, modul admin yang terhubung backend, dan desain ulang UI.
+> Detail perubahan, status validasi, dan daftar hal yang belum diuji:
+> [`docs/round2-edutask.md`](docs/round2-edutask.md).
+
+---
+
 
 Dokumen ini menjelaskan penyebab nyata, perbaikan yang sudah dilakukan di repo, dan
 langkah verifikasi manual.
@@ -55,7 +65,7 @@ file ZIP / file hasil ekstraksi yang salah. Sekarang setiap build menerbitkan fi
 ### Verifikasi checksum (opsional, di HP)
 Aplikasi seperti *Hash Droid* / Termux:
 ```
-sha256sum EduTask-1.0.0-arm64-v8a.apk
+sha256sum EduTask-1.1.0-arm64-v8a.apk
 ```
 Bandingkan dengan isi `SHA256SUMS.txt` di halaman Release. Jika berbeda → unduhan korup,
 unduh ulang.

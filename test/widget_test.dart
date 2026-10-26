@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:edutask/features/student/presentation/pages/student_main_page.dart';
 import 'package:edutask/core/utils/deadline_helper.dart';
 import 'package:edutask/core/utils/date_utils.dart';
 import 'package:edutask/features/auth/domain/app_user.dart';

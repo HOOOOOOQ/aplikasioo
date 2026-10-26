@@ -1,94 +1,121 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../../core/config/app_info.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/app_banner.dart';
+import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../auth/presentation/auth_provider.dart';
 
 class TeacherShell extends ConsumerWidget {
   final Widget child;
   const TeacherShell({super.key, required this.child});
 
+  static const List<({String label, String route, IconData icon})> _sections = [
+    (label: 'Jadwal', route: '/guru/jadwal', icon: Icons.calendar_month_rounded),
+    (label: 'Tugas', route: '/guru/tugas', icon: Icons.assignment_rounded),
+    (label: 'Kode Akses', route: '/guru/kode-akses', icon: Icons.key_rounded),
+    (label: 'Profil', route: '/guru/profil', icon: Icons.person_rounded),
+  ];
+
+  Future<void> _logout(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Keluar dari akun?',
+      content: 'Anda perlu login kembali untuk membuka dashboard guru.',
+      confirmLabel: 'Keluar',
+    );
+    if (!confirmed) return;
+    await ref.read(authControllerProvider.notifier).signOut();
+    ref.invalidate(currentUserProvider);
+    if (context.mounted) context.go('/login');
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userAsync = ref.watch(currentUserProvider);
-    final user = userAsync.valueOrNull;
-    final loc = GoRouterState.of(context).uri.toString();
+    final path = GoRouterState.of(context).uri.path;
+    final user = ref.watch(currentUserProvider).valueOrNull;
 
-    final items = [
-      _NavItem(Icons.dashboard_outlined, Icons.dashboard, 'Dashboard', '/guru'),
-      _NavItem(Icons.calendar_month_outlined, Icons.calendar_month, 'Jadwal Mengajar', '/guru/jadwal'),
-      _NavItem(Icons.assignment_outlined, Icons.assignment, 'Daftar Tugas', '/guru/tugas'),
-      _NavItem(Icons.add_task, Icons.add_task, 'Tambah Tugas', '/guru/tugas/tambah'),
-      _NavItem(Icons.person_outline, Icons.person, 'Profil', '/guru/profil'),
-    ];
+    final routes = ['/guru', '/guru/jadwal', '/guru/tugas', '/guru/kode-akses', '/guru/profil'];
+    var index = routes.indexOf(path);
+    if (index < 0) index = 0;
 
     return Scaffold(
       appBar: AppBar(
-        title: const EduTaskHeaderBanner(isAppBar: true),
-        backgroundColor: AppColors.primary,
-        actions: [
-          if (user != null) Padding(padding: const EdgeInsets.only(right: 8), child: Center(child: Text(user.fullName, style: const TextStyle(color: Colors.white, fontSize: 12)))),
-          IconButton(icon: const Icon(Icons.logout, color: Colors.white), onPressed: () async { await ref.read(authControllerProvider.notifier).signOut(); if (context.mounted) context.go('/login'); }),
-        ],
-      ),
-      drawer: Drawer(
-        child: Column(
+        title: Row(
           children: [
-            DrawerHeader(
-              decoration: const BoxDecoration(gradient: AppColors.headerGradient),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
-                      clipBehavior: Clip.antiAlias,
-                      child: Image.asset('assets/images/edutask_logo.png', fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.school, color: AppColors.primary)),
-                    ),
-                    const SizedBox(width: 10),
-                    const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('EduTask Guru', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                        Text('Tugas & Jadwal', style: TextStyle(color: Colors.white70, fontSize: 11)),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(user?.email ?? '-', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-              ]),
-            ),
-            Expanded(
-              child: ListView(
-                children: items.map((e) {
-                  final sel = loc == e.route;
-                  return ListTile(
-                    leading: Icon(sel ? e.selected : e.icon, color: sel ? AppColors.primary : AppColors.textSecondary),
-                    title: Text(e.label, style: TextStyle(color: sel ? AppColors.primary : AppColors.textPrimary, fontWeight: sel ? FontWeight.w600 : FontWeight.normal, fontSize: 13)),
-                    selected: sel,
-                    selectedTileColor: AppColors.primaryContainer,
-                    onTap: () { Navigator.pop(context); context.go(e.route); },
-                  );
-                }).toList(),
+            const EduTaskLogo(size: 30, withShadow: false),
+            const SizedBox(width: AppSpacing.sm),
+            const Text('EduTask'),
+            const SizedBox(width: AppSpacing.sm),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.primaryContainer,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: const Text(
+                'GURU',
+                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: AppColors.primaryDark, letterSpacing: 0.5),
               ),
             ),
-            ListTile(leading: const Icon(Icons.logout, color: AppColors.error), title: const Text('Logout', style: TextStyle(color: AppColors.error)), onTap: () async { await ref.read(authControllerProvider.notifier).signOut(); if (context.mounted) context.go('/login'); }),
-            const SizedBox(height: 12),
           ],
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Tentang aplikasi',
+            onPressed: () => context.push('/tentang?from=guru'),
+            icon: const Icon(Icons.info_outline_rounded),
+          ),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'logout') _logout(context, ref);
+              if (value == 'about') context.push('/tentang?from=guru');
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 'about', child: Text('Tentang EduTask')),
+              PopupMenuItem(
+                value: 'logout',
+                child: Text('Keluar', style: TextStyle(color: AppColors.error)),
+              ),
+            ],
+          ),
+        ],
       ),
       body: child,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: index,
+        onDestinationSelected: (value) => context.go(routes[value]),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'Beranda'),
+          NavigationDestination(icon: Icon(Icons.calendar_month_outlined), selectedIcon: Icon(Icons.calendar_month_rounded), label: 'Jadwal'),
+          NavigationDestination(icon: Icon(Icons.assignment_outlined), selectedIcon: Icon(Icons.assignment_rounded), label: 'Tugas'),
+          NavigationDestination(icon: Icon(Icons.key_outlined), selectedIcon: Icon(Icons.key_rounded), label: 'Kode'),
+          NavigationDestination(icon: Icon(Icons.person_outline_rounded), selectedIcon: Icon(Icons.person_rounded), label: 'Profil'),
+        ],
+      ),
     );
   }
 }
 
-class _NavItem {
-  final IconData icon;
-  final IconData selected;
-  final String label;
-  final String route;
-  _NavItem(this.icon, this.selected, this.label, this.route);
+/// Dipakai halaman guru untuk tombol cepat.
+const teacherSections = TeacherShell._sections;
+
+/// Footer kecil yang konsisten.
+class TeacherFooter extends StatelessWidget {
+  const TeacherFooter({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.xl),
+      child: Center(
+        child: Text(
+          '${AppInfo.appName} v${AppInfo.version} • ${AppInfo.copyright}',
+          style: const TextStyle(fontSize: 10, color: AppColors.textTertiary),
+        ),
+      ),
+    );
+  }
 }

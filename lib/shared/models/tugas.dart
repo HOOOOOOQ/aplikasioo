@@ -109,6 +109,44 @@ class Tugas extends Equatable {
 
   bool get isCompleted => statusSiswa == 'selesai';
 
+  bool get isPublished => statusPublikasi == 'published';
+  bool get hasLampiran => lampiranPath != null && lampiranPath!.trim().isNotEmpty;
+
+  Tugas copyWith({
+    String? judul,
+    String? deskripsi,
+    String? kelasId,
+    String? kelasNama,
+    String? mataPelajaranId,
+    String? mataPelajaranNama,
+    DateTime? tanggalMulai,
+    DateTime? tenggatWaktu,
+    String? lampiranPath,
+    String? statusPublikasi,
+    String? statusSiswa,
+    DateTime? selesaiPada,
+  }) {
+    return Tugas(
+      id: id,
+      judul: judul ?? this.judul,
+      deskripsi: deskripsi ?? this.deskripsi,
+      guruId: guruId,
+      guruNama: guruNama,
+      kelasId: kelasId ?? this.kelasId,
+      kelasNama: kelasNama ?? this.kelasNama,
+      mataPelajaranId: mataPelajaranId ?? this.mataPelajaranId,
+      mataPelajaranNama: mataPelajaranNama ?? this.mataPelajaranNama,
+      tanggalMulai: tanggalMulai ?? this.tanggalMulai,
+      tenggatWaktu: tenggatWaktu ?? this.tenggatWaktu,
+      lampiranPath: lampiranPath ?? this.lampiranPath,
+      statusPublikasi: statusPublikasi ?? this.statusPublikasi,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      statusSiswa: statusSiswa ?? this.statusSiswa,
+      selesaiPada: selesaiPada ?? this.selesaiPada,
+    );
+  }
+
   @override
   List<Object?> get props => [id, judul, tenggatWaktu, statusSiswa];
 }

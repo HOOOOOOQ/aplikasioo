@@ -23,11 +23,9 @@ final currentUserProvider = FutureProvider<AppUser?>((ref) async {
   try {
     ref.watch(authStateProvider);
   } catch (_) {}
-  try {
-    return await repo.getCurrentProfile();
-  } catch (_) {
-    return null;
-  }
+  // Error dibiarkan naik: splash menampilkan kartu "gagal memuat sesi" dengan
+  // tombol coba lagi, bukan berpura-pura pengguna belum login.
+  return repo.getCurrentProfile();
 });
 
 // Sync provider for quick access

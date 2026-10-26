@@ -13,14 +13,11 @@ class AuthRepository {
     if (c == null) return null;
     final user = SupabaseService.currentUser;
     if (user == null) return null;
-    try {
-      final data = await c.from('profiles').select().eq('id', user.id).maybeSingle();
-      if (data == null) return null;
-      return AppUser.fromJson(data);
-    } catch (e) {
-      // Jika RLS blocked atau belum ada profile
-      return null;
-    }
+    // Sengaja TIDAK menelan error: kegagalan jaringan/RLS harus terlihat oleh
+    // splash & pengaturan agar pengguna tidak diam-diam dianggap "belum login".
+    final data = await c.from('profiles').select().eq('id', user.id).maybeSingle();
+    if (data == null) return null;
+    return AppUser.fromJson(data);
   }
 
   Future<AuthResponse> signIn({required String email, required String password}) async {
