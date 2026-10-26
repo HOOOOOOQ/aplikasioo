@@ -92,7 +92,13 @@ class AuthRepository {
         'Access token admin tidak tersedia. Silakan login ulang sebagai admin.',
       );
     }
-    if (session.isExpired) {
+    var tokenExpired = false;
+    try {
+      tokenExpired = session.isExpired;
+    } catch (_) {
+      // Token tidak bisa diparse: biarkan server yang menilai (hasilnya 401).
+    }
+    if (tokenExpired) {
       throw const TeacherInviteException(
         'session_expired',
         'Access token admin kedaluwarsa. Silakan login ulang sebagai admin.',
