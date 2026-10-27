@@ -12,6 +12,7 @@ import '../../../../core/widgets/app_states.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../../core/widgets/status_chip.dart';
 import '../../../../shared/models/tugas.dart';
+import '../../../../shared/models/tugas_pin_policy.dart';
 import '../../../../shared/repositories/tugas_repository.dart';
 import '../../../../shared/services/supabase_service.dart';
 
@@ -77,9 +78,28 @@ class _TeacherTasksPageState extends ConsumerState<TeacherTasksPage> {
     }
   }
 
+  /// Sematkan/lepas sematan tugas milik sendiri. Guru lain tidak melihat menu
+  /// ini, dan server tetap menolak lewat RPC `set_tugas_pin`.
+  Future<void> _togglePin(Tugas tugas) async {
+    final next = !tugas.isPinned;
+    try {
+      await TugasRepository().setPin(tugasId: tugas.id, pinned: next);
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        next ? 'Tugas disematkan di atas daftar.' : 'Sematan tugas dilepas.',
+      );
+      ref.invalidate(teacherTasksProvider);
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(context, AppError.from(e).shortMessage, isError: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final async = ref.watch(teacherTasksProvider);
+    final userId = SupabaseService.currentUser?.id;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -128,7 +148,8 @@ class _TeacherTasksPageState extends ConsumerState<TeacherTasksPage> {
                   eyebrow: 'Tugas saya',
                   title: 'Kelola Tugas',
                   subtitle: '${all.where((t) => t.isPublished).length} terbit • '
-                      '${all.where((t) => t.statusPublikasi == 'draft').length} draft',
+                      '${all.where((t) => t.statusPublikasi == 'draft').length} draft • '
+                      '${all.where((t) => t.isPinned).length} disematkan',
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 AppSearchField(
@@ -188,6 +209,10 @@ class _TeacherTasksPageState extends ConsumerState<TeacherTasksPage> {
                             children: [
                               Row(
                                 children: [
+                                  if (tugas.isPinned) ...[
+                                    const Icon(Icons.push_pin_rounded, size: 15, color: AppColors.primary),
+                                    const SizedBox(width: 4),
+                                  ],
                                   Expanded(
                                     child: Text(
                                       tugas.judul,
@@ -201,6 +226,7 @@ class _TeacherTasksPageState extends ConsumerState<TeacherTasksPage> {
                                       if (value == 'edit') context.push('/guru/tugas/${tugas.id}/edit');
                                       if (value == 'status') context.push('/guru/tugas/${tugas.id}/status');
                                       if (value == 'publish') _togglePublish(tugas);
+                                      if (value == 'pin') _togglePin(tugas);
                                       if (value == 'archive') _archive(tugas);
                                     },
                                     itemBuilder: (context) => [
@@ -210,6 +236,16 @@ class _TeacherTasksPageState extends ConsumerState<TeacherTasksPage> {
                                         value: 'publish',
                                         child: Text(tugas.isPublished ? 'Jadikan draft' : 'Terbitkan'),
                                       ),
+                                      if (TugasPinPolicy.canManage(
+                                        isAdmin: false,
+                                        isGuru: SupabaseService.currentUser != null,
+                                        userId: userId,
+                                        tugas: tugas,
+                                      ))
+                                        PopupMenuItem(
+                                          value: 'pin',
+                                          child: Text(tugas.isPinned ? 'Lepas sematan' : 'Sematkan ke atas'),
+                                        ),
                                       const PopupMenuItem(
                                         value: 'archive',
                                         child: Text('Arsipkan tugas'),
@@ -234,6 +270,8 @@ class _TeacherTasksPageState extends ConsumerState<TeacherTasksPage> {
                                       isCompleted: false,
                                     ),
                                   ),
+                                  if (tugas.isPinned)
+                                    const MetaPill(label: 'Disematkan', icon: Icons.push_pin_rounded),
                                   MetaPill(
                                     label: AppDateUtils.formatTanggal(tugas.tenggatWaktu),
                                     icon: Icons.event_outlined,

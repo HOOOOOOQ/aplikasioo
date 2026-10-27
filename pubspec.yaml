@@ -42,6 +42,14 @@ dependencies:
   audioplayers: ^6.1.0
   # Versi & nomor build dibaca dari metadata APK (bukan hardcode).
   package_info_plus: ^8.0.0
+  # Ekspor laporan PDF. `pdf` = pembuat dokumen (murni Dart, bisa diuji tanpa
+  # plugin) dan `printing` = pratinjau/cetak/bagikan di Android.
+  # Versi dikunci agar tetap kompatibel dengan Flutter 3.35 (printing >=5.15
+  # menuntut Flutter 3.41).
+  pdf: ^3.11.3
+  printing: ^5.14.3
+  # Unduhan PDF di Web memakai Blob + anchor (tanpa CDN pihak ketiga).
+  web: ^1.0.0
 
 dev_dependencies:
   flutter_test:

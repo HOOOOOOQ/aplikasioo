@@ -11,8 +11,10 @@ import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/app_states.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../../core/widgets/status_chip.dart';
+import '../../../auth/presentation/auth_provider.dart';
 import '../../../../shared/models/kelas.dart';
 import '../../../../shared/models/tugas.dart';
+import '../../../../shared/models/tugas_pin_policy.dart';
 import '../../../../shared/repositories/kelas_repository.dart';
 import '../../../../shared/repositories/tugas_repository.dart';
 
@@ -50,7 +52,9 @@ class _AdminTasksPageState extends ConsumerState<AdminTasksPage> {
     try {
       final list = await KelasRepository().fetchAll();
       if (mounted) setState(() => _kelas = list);
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Gagal memuat daftar kelas: $error');
+    }
   }
 
   Future<List<Tugas>> _load() {
@@ -97,8 +101,27 @@ class _AdminTasksPageState extends ConsumerState<AdminTasksPage> {
     }
   }
 
+  /// Sematkan/lepas sematan tugas. Server (RPC `set_tugas_pin`) memeriksa
+  /// ulang izin; kegagalan otorisasi ditampilkan sebagai pesan error.
+  Future<void> _togglePin(Tugas tugas) async {
+    final next = !tugas.isPinned;
+    try {
+      await TugasRepository().setPin(tugasId: tugas.id, pinned: next);
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        next ? 'Tugas disematkan di atas daftar.' : 'Sematan tugas dilepas.',
+      );
+      await _refresh();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(context, AppError.from(e).shortMessage, isError: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(currentUserProvider).valueOrNull;
     return Scaffold(
       backgroundColor: AppColors.background,
       body: RefreshIndicator(
@@ -132,6 +155,7 @@ class _AdminTasksPageState extends ConsumerState<AdminTasksPage> {
                       _stat('Terbit', '${(snapshot.data ?? const []).where((t) => t.isPublished).length}'),
                       _stat('Draft', '${(snapshot.data ?? const []).where((t) => t.statusPublikasi == 'draft').length}'),
                       _stat('Berlampiran', '${(snapshot.data ?? const []).where((t) => t.hasLampiran).length}'),
+                      _stat('Disematkan', '${(snapshot.data ?? const []).where((t) => t.isPinned).length}'),
                     ],
                   ),
                 ),
@@ -210,6 +234,10 @@ class _AdminTasksPageState extends ConsumerState<AdminTasksPage> {
                             children: [
                               Row(
                                 children: [
+                                  if (tugas.isPinned) ...[
+                                    const Icon(Icons.push_pin_rounded, size: 15, color: AppColors.primary),
+                                    const SizedBox(width: 4),
+                                  ],
                                   Expanded(
                                     child: Text(
                                       tugas.judul,
@@ -222,6 +250,7 @@ class _AdminTasksPageState extends ConsumerState<AdminTasksPage> {
                                     onSelected: (value) {
                                       if (value == 'detail') context.push('/admin/tugas/${tugas.id}');
                                       if (value == 'publish') _togglePublish(tugas);
+                                      if (value == 'pin') _togglePin(tugas);
                                       if (value == 'delete') _delete(tugas);
                                     },
                                     itemBuilder: (context) => [
@@ -230,6 +259,16 @@ class _AdminTasksPageState extends ConsumerState<AdminTasksPage> {
                                         value: 'publish',
                                         child: Text(tugas.isPublished ? 'Jadikan draft' : 'Terbitkan'),
                                       ),
+                                      if (TugasPinPolicy.canManage(
+                                        isAdmin: user?.isAdmin ?? false,
+                                        isGuru: user?.isGuru ?? false,
+                                        userId: user?.id,
+                                        tugas: tugas,
+                                      ))
+                                        PopupMenuItem(
+                                          value: 'pin',
+                                          child: Text(tugas.isPinned ? 'Lepas sematan' : 'Sematkan ke atas'),
+                                        ),
                                       const PopupMenuItem(
                                         value: 'delete',
                                         child: Text('Hapus', style: TextStyle(color: AppColors.error)),
@@ -255,6 +294,8 @@ class _AdminTasksPageState extends ConsumerState<AdminTasksPage> {
                                       isCompleted: false,
                                     ),
                                   ),
+                                  if (tugas.isPinned)
+                                    const MetaPill(label: 'Disematkan', icon: Icons.push_pin_rounded),
                                   MetaPill(
                                     label: AppDateUtils.formatTanggalJam(tugas.tenggatWaktu),
                                     icon: Icons.event_outlined,
