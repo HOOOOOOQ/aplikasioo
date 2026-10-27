@@ -10,7 +10,7 @@ tugas, lampiran, kode akses siswa, dan laporan penyelesaian tugas.
 > tanpa CDN) dan **pin tugas** (migration `007`: `is_pinned`, `position`, RPC
 > `set_tugas_pin` — RLS + pemeriksaan ulang otorisasi server, urutan
 > pin → position → tenggat → id). Hasil CI: `flutter analyze` 0 error,
-> **207 tes lulus**, `build web` + `build apk` hijau.
+> **210 tes lulus**, `build web` + `build apk` hijau (build #96).
 > **Migration `007` belum dijalankan** di database mana pun.
 > SQL lengkap, langkah manual, hasil CI, dan batasan yang belum diuji:
 > [`docs/round6-edutask.md`](docs/round6-edutask.md).

@@ -466,7 +466,7 @@ indikator "Menyiapkan…" selama proses.
 ## 9. Hasil verifikasi
 
 Diuji lewat GitHub Actions pada branch `arena/860055b9-aplikasioo`, commit
-**`2952773`** (PR #66) — commit terakhir yang mengubah kode. Tidak ada
+**`ecc2af2`** (PR #66) — commit terakhir yang mengubah kode. Tidak ada
 pemeriksaan di bawah ini yang dijalankan di laptop pengembang; semuanya berasal
 dari CI.
 
@@ -476,28 +476,28 @@ dari CI.
 | Parser SQL 7 migration | **SELESAI (lokal)** | 7/7 lolos `pgsql-parser`. |
 | `flutter pub get` | **TERVERIFIKASI CI** | Sukses (job `analyze-test`, `web-build`, `build`). |
 | `flutter analyze --no-fatal-infos --no-fatal-warnings` | **TERVERIFIKASI CI** | **0 error, 0 warning, 4 info** (semuanya info lama di `back_guard.dart` & `session_guard.dart`, bukan dari ronde ini). |
-| `flutter test` | **TERVERIFIKASI CI** | **207 tes lulus** (sebelumnya 162; +45 tes baru ronde ini: 42 fitur + 3 pemetaan error). |
+| `flutter test` | **TERVERIFIKASI CI** | **210 tes lulus** (sebelumnya 162; +48 tes baru ronde ini: 42 fitur, 3 pemetaan error, 3 konsistensi CSV ↔ PDF + label periode). |
 | `flutter build web --release` | **TERVERIFIKASI CI** | Sukses (job `web-build` hijau). Pemeriksaan artefak lolos: `index.html`, `manifest.json`, `flutter_bootstrap.js`, `main.dart.js`, `flutter_service_worker.js`, ikon 192 px ada; teks `EduTask` ada di `index.html`; **tidak ada** string `service_role` di bundle. Ukuran pasti tidak ditampilkan di komentar PR (ada di log job). |
-| `flutter build apk --release` | **TERVERIFIKASI CI** | **APK build #93** sukses: universal 67 MB (versionCode 93), arm64-v8a 27 MB (2093), armeabi-v7a 25 MB (1093), x86_64 28 MB (4093); `applicationId com.edutask.sekolah`, `minSdk 24`, `targetSdk 36`, ditandatangani kunci uji yang sama (`f3d985e4…ffcbf9`). |
-| `install-test` (emulator x86_64) | **GAGAL — INFRASTRUKTUR CI** | Terjadi pada build #91 **dan** #93: emulator tidak menghasilkan log smoke test (`emulator gagal boot / action gagal sebelum skrip`). Langkah ini memakai `continue-on-error`, jadi job tetap hijau, tetapi **instalasi APK belum terbukti** lewat CI. |
+| `flutter build apk --release` | **TERVERIFIKASI CI** | **APK build #96** sukses: universal 67 MB (versionCode 96), arm64-v8a 27 MB (2096), armeabi-v7a 25 MB (1096), x86_64 28 MB (4096); `applicationId com.edutask.sekolah`, `minSdk 24`, `targetSdk 36`, ditandatangani kunci uji yang sama (`f3d985e4…ffcbf9`). |
+| `install-test` (emulator x86_64) | **GAGAL — INFRASTRUKTUR CI** | Terjadi pada build #91, #93, dan #96: emulator tidak menghasilkan log smoke test (`emulator gagal boot / action gagal sebelum skrip`). Langkah ini memakai `continue-on-error`, jadi job tetap hijau, tetapi **instalasi APK belum terbukti** lewat CI. |
 | Uji pin/PDF manual di perangkat nyata | **BELUM TERVERIFIKASI** | Butuh perangkat + database live. |
 | Uji di browser nyata | **BELUM TERVERIFIKASI** | Butuh browser + Supabase live. |
 | Migration di database produksi | **BELUM DIJALANKAN** | Jalankan manual (bagian 3.1). |
 
-Detail APK build #93 (`SHA256SUMS.txt` lengkap ada di komentar PR):
+Detail APK build #96 (`SHA256SUMS.txt` lengkap ada di komentar PR):
 
 | File | Ukuran | versionCode | SHA-256 |
 |---|---|---|---|
-| `EduTask-1.2.0-arm64-v8a.apk` | 27 MB | 2093 | `96651cd44030d412a6ab4a9bbd69e85f8cd799aa83c6532058151d2cf40e47c1` |
-| `EduTask-1.2.0-armeabi-v7a.apk` | 25 MB | 1093 | `350930cd2c4b1fac6a6b41dd7be286b1009dce44f47a28221babd7a8e01a687c` |
-| `EduTask-1.2.0-universal.apk` | 67 MB | 93 | `94a8effc1879aa0b81eacce2435b800b004565d2531b0b49729444d54255bdd7` |
-| `EduTask-1.2.0-x86_64.apk` | 28 MB | 4093 | `b160e02a153b84cac3bfb2c83c1961c98e1007313818ba5199cf6eed0b18bfc0` |
+| `EduTask-1.2.0-arm64-v8a.apk` | 27 MB | 2096 | `eeb860b35f58c77539059aa503371ca882075b854b82949be19717a4a0246a49` |
+| `EduTask-1.2.0-armeabi-v7a.apk` | 25 MB | 1096 | `b8514956f63ba02386226c6613a27a8a412ccfc2740c1440b898191243831d86` |
+| `EduTask-1.2.0-universal.apk` | 67 MB | 96 | `ee24d96917b18a5de34e934279ee6c889d967ad2c267fac8f0e100c82dcf9ed4` |
+| `EduTask-1.2.0-x86_64.apk` | 28 MB | 4096 | `b7f90825c05cd6bfe3e25a73d885f7da148078a5adb983f613426ab369e3e87f` |
 
-> APK pada build #93 adalah artefak **job CI** (bisa diunduh dari halaman run
+> APK pada build #96 adalah artefak **job CI** (bisa diunduh dari halaman run
 > Actions). Release `latest-apk` belum diperbarui karena workflow APK hanya
 > memublikasikan release saat push ke `main` — yaitu setelah PR ini digabung.
 
-Catatan penting soal `install-test`: pada build #91 dan #93 langkah emulator **gagal**
+Catatan penting soal `install-test`: pada build #91, #93, dan #96 langkah emulator **gagal**
 (emulator tidak boot / action gagal sebelum skrip dijalankan) sehingga tidak ada
 bukti instalasi dari CI. Karena langkah itu `continue-on-error: true`, status
 job tetap hijau — angka "hijau" di atas **tidak** boleh dibaca sebagai bukti
@@ -523,7 +523,7 @@ Error: The method 'decodeLazy' isn't defined for the type 'ZLibDecoder'.
 * **Perbaikan:** `image: '>=4.10.0 <4.11.0'` di `pubspec.yaml` (4.10.x memakai
   `decodeBytes`, aman dengan `archive 4.0.9`). Komentar di pubspec menjelaskan
   alasan dan kapan pin ini boleh dilepas.
-* **Bukti:** setelah pin, `analyze` 0 error, `flutter test` 207 lulus,
+* **Bukti:** setelah pin, `analyze` 0 error, `flutter test` 210 lulus,
   `build web` sukses, `build apk` sukses.
 
 ### 9.2 Perbaikan diagnosa CI
@@ -531,11 +531,34 @@ Error: The method 'decodeLazy' isn't defined for the type 'ZLibDecoder'.
 Agar kegagalan berikutnya tidak perlu menebak, `verify.yml` sekarang:
 
 * menulis ringkasan blok `[E]` dari `flutter test` ke komentar PR
-  (`### Tes yang gagal (ringkas)`),
+  (`### Tes yang gagal (ringkas)`); pola grep diperluas ke `Expected:`,
+  `Actual:`, `Which:`, `TimeoutException`, `Failed to load`, dan
+  `Some tests failed` karena kegagalan *ekspektasi* tidak selalu memakai
+  penanda `[E]`.
 * menulis 12 KB terakhir log `flutter build web` ke komentar PR
   (`### Kegagalan flutter build web`),
 * memakai komentar terpisah (bukan `--edit-last`) supaya job `analyze-test` dan
   `web-build` tidak saling menimpa komentar.
+
+### 9.3 Kegagalan tes konsistensi CSV ↔ PDF (dan perbaikannya)
+
+Commit `4d25b72` membuat dua job merah (`analyze-test` **dan** `build` — keduanya
+menjalankan `flutter test`). Gejala di komentar PR menyesatkan: hanya baris ✅
+yang terlihat dan grep `[E]` kosong, karena ringkasan hanya menangkap blok `[E]`
+sementara kegagalan *ekspektasi* ditulis sebagai baris `Expected: contains …`.
+
+* **Akar masalah (bukan bug aplikasi):** tes baru menegaskan `40.0%` untuk baris
+  dengan 20 selesai dari 30 siswa. Rumus `TugasReportRow.persen` adalah
+  `selesai / total × 100`, jadi nilai benarnya **66.7%**; baris kedua
+  15/30 = **50.0%**.
+* **Perbaikan:** ekspektasi tes dibetulkan menjadi `66.7%` dan `50.0%` (dengan
+  komentar asal angkanya). Tidak ada kode produksi ronde ini yang diubah dan
+  tidak ada tes yang dihapus atau dilonggarkan.
+* **Pencegahan:** `verify.yml` kini menyertakan `Expected:`/`Actual:`/`Which:`
+  di ringkasan kegagalan sehingga nama tes + nilai yang diharapkan langsung
+  terlihat di komentar PR.
+* **Bukti:** commit `ecc2af2` → `analyze-test` hijau (**210 tes lulus**),
+  `build` hijau (**build #96**), `web-build` hijau.
 
 ---
 
