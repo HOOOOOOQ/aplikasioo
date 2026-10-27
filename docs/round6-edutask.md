@@ -560,6 +560,36 @@ sementara kegagalan *ekspektasi* ditulis sebagai baris `Expected: contains …`.
 * **Bukti:** commit `ecc2af2` → `analyze-test` hijau (**210 tes lulus**),
   `build` hijau (**build #96**), `web-build` hijau.
 
+### 9.4 Unduh APK pratinjau (untuk uji di perangkat)
+
+Artifact GitHub Actions memerlukan login dan berbentuk `.zip`, sedangkan
+release `latest-apk` hanya diperbarui saat push ke `main`. Karena itu job
+`build` sekarang juga memublikasikan **pre-release** `preview-apk` dari branch
+PR (langkah `Publikasikan APK pratinjau (bukan main)`), sehingga APK bisa
+diunduh langsung sebagai berkas `.apk` tanpa login. Release `latest-apk`
+tidak tersentuh.
+
+**Halaman release:** <https://github.com/HOOOOOOQ/aplikasioo/releases/tag/preview-apk>
+
+| Perangkat | Berkas | Unduh |
+|---|---|---|
+| HP Android modern (disarankan) | `EduTask-1.2.0-arm64-v8a.apk` — 27 MB | <https://github.com/HOOOOOOQ/aplikasioo/releases/download/preview-apk/EduTask-1.2.0-arm64-v8a.apk> |
+| HP Android 32-bit lama | `EduTask-1.2.0-armeabi-v7a.apk` — 25 MB | <https://github.com/HOOOOOOQ/aplikasioo/releases/download/preview-apk/EduTask-1.2.0-armeabi-v7a.apk> |
+| Semua ABI dalam satu berkas | `EduTask-1.2.0-universal.apk` — 67 MB | <https://github.com/HOOOOOOQ/aplikasioo/releases/download/preview-apk/EduTask-1.2.0-universal.apk> |
+| Emulator x86_64 | `EduTask-1.2.0-x86_64.apk` — 28 MB | <https://github.com/HOOOOOOQ/aplikasioo/releases/download/preview-apk/EduTask-1.2.0-x86_64.apk> |
+| Checksum | `SHA256SUMS.txt` | <https://github.com/HOOOOOOQ/aplikasioo/releases/download/preview-apk/SHA256SUMS.txt> |
+
+Isi build #100 (commit `1530157`, sama kode dengan `ecc2af2`):
+`com.edutask.sekolah`, versionCode 100, versionName 1.2.0, minSdk 24,
+targetSdk 36, signature v2 + v3 memakai keystore uji (`f3d985e4…ffcbf9`).
+Berkas pratinjau **ditimpa setiap build baru** di branch ini; tautan di atas
+tetap sama karena memakai tag `preview-apk`.
+
+> Pratinjau ini **belum lolos uji instalasi otomatis** (langkah `install-test`
+> di CI masih gagal karena emulator, lihat tabel §9) dan **migration 007 belum
+> dijalankan**. Setelah memasang APK: ekspor PDF bisa langsung dicoba, tetapi
+> tombol semat akan menampilkan pesan error sampai SQL §3 dijalankan.
+
 ---
 
 ## 10. Catatan lingkungan
