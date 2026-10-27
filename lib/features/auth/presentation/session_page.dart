@@ -8,8 +8,10 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/services/app_version.dart';
 import '../../../core/services/platform_capabilities.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/app_states.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../shared/services/supabase_service.dart';
+import '../domain/app_user.dart';
 import 'auth_provider.dart';
 
 /// Informasi sesi perangkat saat ini.
@@ -42,7 +44,7 @@ class _SessionPageState extends ConsumerState<SessionPage> {
       content: 'Sesi di semua perangkat akan dicabut. Anda perlu masuk kembali di perangkat ini.',
       confirmLabel: 'Keluar semua',
     );
-    if (!confirmed) return;
+    if (!confirmed || !mounted) return;
 
     setState(() => _busy = true);
     final router = GoRouter.of(context);

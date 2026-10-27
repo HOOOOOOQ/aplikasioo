@@ -14,7 +14,7 @@ import 'notification_backend_stub.dart'
 class NotificationService {
   NotificationService._();
 
-  static final NotificationBackend _backend = const NotificationBackend();
+  static const NotificationBackend _backend = NotificationBackend();
   static bool _permissionAsked = false;
   static bool _permissionGranted = false;
 

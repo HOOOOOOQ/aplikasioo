@@ -8,6 +8,7 @@ import '../../../core/widgets/app_states.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../student/identity/student_identity_provider.dart';
 import '../data/akademik_providers.dart';
+import '../domain/akademik_models.dart';
 import 'akademik_widgets.dart';
 
 /// Daftar guru yang mengajar di kelas siswa beserta tombol chat.
