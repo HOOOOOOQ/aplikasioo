@@ -57,6 +57,11 @@ tidak memicu build.
 
 ## 4. Menyiapkan dari nol
 
+0. **Aktifkan Pages sekali saja** — Settings → Pages → **Source: GitHub Actions**.
+   `GITHUB_TOKEN` di CI **tidak** berizin menyalakan Pages pada repo yang belum
+   pernah memakainya, jadi langkah ini tidak bisa diotomatiskan. Tanpa langkah
+   ini, job `deploy` akan berhenti dengan pesan *Pages belum aktif* (build web
+   sendiri tetap berhasil).
 1. **Secrets** — Settings → Secrets and variables → Actions:
    * `SUPABASE_URL` — contoh `https://abcdefghijklmnop.supabase.co`
    * `SUPABASE_ANON_KEY` — kunci *anon public* (bukan `service_role`)
@@ -70,7 +75,7 @@ tidak memicu build.
 
 | Gejala | Penyebab | Tindakan |
 |---|---|---|
-| `Resource not accessible by integration` pada langkah *Setup Pages* | Token CI tidak boleh mengaktifkan Pages | Settings → Pages → Source: **GitHub Actions**, lalu jalankan ulang workflow |
+| *Pages belum aktif* pada langkah *Setup Pages* | Pages belum pernah diaktifkan; token CI tidak boleh mengaktifkannya | Settings → Pages → Source: **GitHub Actions**, lalu **Re-run all jobs** |
 | `Secret SUPABASE_URL dan/atau SUPABASE_ANON_KEY belum diatur` | Secret belum ada / salah nama | Tambahkan di Settings → Secrets and variables → Actions |
 | Halaman terbuka tapi layar putih | `base-href` salah (mis. disajikan di sub-path lain) | Pastikan Pages menyajikan dari `/<repo>/`; `--base-href` dihitung otomatis dari nama repo |
 | `Couldn't find the placeholder for base href` | `<base href>` di `web/index.html` diisi nilai tetap | Biarkan `<base href="$FLUTTER_BASE_HREF">` (placeholder) |

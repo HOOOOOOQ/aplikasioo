@@ -183,12 +183,41 @@ jobs:
 
     steps:
       - name: Setup Pages
+        id: pages
+        # GITHUB_TOKEN tidak punya izin administratif untuk mengaktifkan Pages
+        # pada repo yang belum pernah memakainya. `enablement: true` dicoba
+        # dulu; bila ditolak, langkah berikutnya menjelaskan tindakan manualnya
+        # (bukan gagal dengan pesan "Resource not accessible" yang membingungkan).
+        continue-on-error: true
         uses: actions/configure-pages@v5
         with:
-          # Mencoba mengaktifkan Pages otomatis bila belum pernah diaktifkan.
-          # Bila token tidak berizin, aktifkan manual: Settings → Pages →
-          # Source: GitHub Actions.
           enablement: true
+
+      - name: Pages belum aktif — tindakan yang diperlukan
+        if: steps.pages.outcome == 'failure'
+        run: |
+          {
+            echo "::error::GitHub Pages belum aktif dan token CI tidak berizin mengaktifkannya."
+            echo "Buka: Settings → Pages → Source: GitHub Actions, lalu jalankan ulang workflow ini."
+            echo ""
+            echo "### GitHub Pages belum aktif"
+            echo ""
+            echo "Build web **berhasil**, tetapi situs belum bisa diterbitkan karena"
+            echo "GitHub Pages belum dinyalakan di repository ini."
+            echo ""
+            echo "**Sekali saja, ±20 detik:**"
+            echo ""
+            echo "1. Buka <${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/settings/pages>"
+            echo "2. Pada **Build and deployment → Source**, pilih **GitHub Actions**"
+            echo "3. Jalankan ulang workflow ini: **Re-run all jobs**"
+            echo ""
+            echo "Setelah itu setiap push ke \`main\` otomatis menerbitkan situs di"
+            echo "<https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/>."
+            echo ""
+            echo "Sementara itu, aplikasi tetap bisa dijalankan lokal:"
+            echo "\`bash scripts/web/run_web.sh\` → <http://localhost:8080>."
+          } | tee pages-not-enabled.txt >> "$GITHUB_STEP_SUMMARY"
+          exit 1
 
       - name: Deploy ke GitHub Pages
         id: deployment
