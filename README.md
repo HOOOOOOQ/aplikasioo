@@ -3,6 +3,14 @@
 **Tugas & Jadwal Sekolah** — aplikasi Flutter + Supabase untuk mengelola jadwal pelajaran,
 tugas, lampiran, kode akses siswa, dan laporan penyelesaian tugas.
 
+> **Ronde 5 (v1.2.0, build #87):** **target Flutter Web** (scaffold `web/`,
+> conditional import untuk notifikasi/CSV/URL strategy), **onboarding 8 langkah**,
+> halaman **Bantuan & FAQ**, **Guru Kelas**, **Kalender Tenggat**, **Riwayat Kode
+> Akses**, **Sesi Perangkat**, **Ekspor CSV laporan**, pengingat tenggat yang
+> benar-benar dijadwalkan, ukuran teks aksesibel (90–140 %), serta perbaikan
+> bug alur tutorial & konteks audio iOS.
+> Detail: [`docs/round5-edutask.md`](docs/round5-edutask.md).
+>
 > **Ronde 4 (v1.2.0, build #80):** navigasi Back yang konsisten (konfirmasi
 > keluar di beranda), kode akses idempoten + tampil tanpa navigasi otomatis,
 > fondasi akademik & chat (pengumuman, kalender, pengumpulan/nilai, diskusi,
@@ -35,8 +43,11 @@ tugas, lampiran, kode akses siswa, dan laporan penyelesaian tugas.
 
 - Material 3, tema biru, komponen bersama (`AppCard`, `AppHeroHeader`, `AppEmptyState`,
   `AppErrorState`, `StatusChip`, dan lainnya).
-- Splash dengan pemeriksaan nyata (onboarding → sesi → role), onboarding 5 langkah yang
-  dapat dibuka ulang, halaman Tentang berisi tim & sekolah.
+- Splash dengan pemeriksaan nyata (onboarding → sesi → role), onboarding 8 langkah yang
+  dapat dibuka ulang (dari Pengaturan maupun halaman login), halaman Tentang berisi
+  tim & sekolah, serta halaman Bantuan & FAQ per peran.
+- Berjalan di **Android** dan **Web** dari satu basis kode; ekspor CSV laporan
+  (berkas di Android, papan klip di Web).
 - Login hanya memakai label "Email" dan "Kata Sandi" — tidak ada petunjuk kredensial,
   akun contoh, atau akun admin hardcoded.
 
