@@ -95,6 +95,61 @@ flutter test
 
 ## Menjalankan di Web (Flutter Web)
 
+### Prasyarat singkat per sistem operasi
+
+| Sistem | Pasang Flutter 3.35.x | Catatan |
+|---|---|---|
+| **Windows 10/11** | Unduh ZIP Flutter, ekstrak ke `C:\src\flutter`, tambahkan `C:\src\flutter\bin` ke `PATH` | Pakai **PowerShell** atau **Git Bash** untuk skrip `.sh`; Git for Windows wajib |
+| **Linux (Ubuntu/Debian)** | `sudo snap install flutter --classic` **atau** unduh tarball dan tambahkan `bin` ke `PATH` | `git`, `curl`, `unzip` wajib ada |
+| **macOS** | `brew install --cask flutter` | `flutter run -d chrome` paling nyaman di sini |
+| **Termux (Android)** | `pkg install git curl unzip` lalu unduh tarball Flutter **arm64**, ekstrak, tambahkan ke `PATH` | Termux **tidak** punya Chrome; wajib `WEB_DEVICE=web-server` lalu buka `http://localhost:8080` di browser Android |
+
+Cek sekali: `flutter --version` (harus 3.35.x) dan `flutter doctor`.
+
+### Cara tercepat (semua sistem)
+
+```bash
+git clone https://github.com/HOOOOOOQ/aplikasioo.git
+cd aplikasioo
+
+cp .env.web.example .env.web     # Windows: copy .env.web.example .env.web
+# isi SUPABASE_URL + SUPABASE_ANON_KEY dari Supabase → Project Settings → API
+
+bash scripts/web/run_web.sh      # → http://localhost:8080
+```
+
+Tanpa skrip (perintah Flutter langsung):
+
+```bash
+flutter pub get
+flutter run -d chrome --web-hostname 0.0.0.0 --web-port 8080 \
+  --dart-define=SUPABASE_URL=https://<project-ref>.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=<anon-key>
+```
+
+### Mengakses dari HP lain di Wi-Fi yang sama
+
+1. Jalankan server pada semua antarmuka:
+   ```bash
+   WEB_HOST=0.0.0.0 bash scripts/web/run_web.sh
+   ```
+   Skrip mencetak alamat LAN, mis. `http://192.168.1.23:8080`.
+2. Cari IP komputer secara manual bila perlu:
+   * Windows: `ipconfig` → *IPv4 Address* pada adaptor Wi-Fi
+   * Linux/Termux: `ip addr show` atau `hostname -I`
+   * macOS: `ipconfig getifaddr en0`
+3. Buka `http://<IP-komputer>:8080` di browser HP — perangkat harus di SSID yang sama.
+4. Bila tidak terbuka, izinkan port 8080 di firewall:
+   * Windows: *Windows Defender Firewall → Advanced settings → Inbound Rules → New Rule → Port → TCP 8080 → Allow*
+   * Linux (ufw): `sudo ufw allow 8080/tcp`
+5. Supabase Auth hanya menerima `localhost` dan domain HTTPS; untuk akses lewat
+   IP LAN, pendaftaran/redirect OAuth mungkin perlu disesuaikan di
+   **Supabase → Authentication → URL Configuration**. Login email+password tetap bekerja.
+
+> **Peringatan:** `flutter run`/`web-server` adalah server pengembangan **tanpa
+> autentikasi**. Jangan gunakan `0.0.0.0` di Wi-Fi publik/kantor. Untuk produksi
+> pakai `flutter build web --release` lalu host statis via HTTPS.
+
 Target Web memakai kode yang sama dengan Android. Perbedaan platform ditangani
 lewat *conditional import* (`lib/core/routing/url_strategy*.dart`,
 `lib/features/notifications/notification_backend_*.dart`,

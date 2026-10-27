@@ -180,18 +180,29 @@ class _AppBackGuardState extends State<AppBackGuard> {
       case BackActionKind.exitApp:
         _exit();
       case BackActionKind.confirmExit:
-        final confirmed = widget.confirmExit != null
-            ? await widget.confirmExit!(context)
-            : await showConfirmDialog(
-                context,
-                title: widget.exitTitle,
-                content: widget.exitMessage,
-                confirmLabel: 'Keluar',
-                cancelLabel: 'Tetap di aplikasi',
-              );
+        final confirmed = await _askExitConfirmation();
         if (!confirmed || !mounted) return;
         _exit();
     }
+  }
+
+  /// Menampilkan dialog konfirmasi keluar.
+  ///
+  /// `BuildContext` hanya dipakai **sebelum** `await` pertama (fungsi ini tidak
+  /// `async` dan langsung mengembalikan Future dari dialog), sehingga tidak ada
+  /// context yang menyeberangi async gap — sumber peringatan
+  /// `use_build_context_synchronously` sebelumnya.
+  Future<bool> _askExitConfirmation() {
+    if (!mounted) return Future<bool>.value(false);
+    final custom = widget.confirmExit;
+    if (custom != null) return custom(context);
+    return showConfirmDialog(
+      context,
+      title: widget.exitTitle,
+      content: widget.exitMessage,
+      confirmLabel: 'Keluar',
+      cancelLabel: 'Tetap di aplikasi',
+    );
   }
 
   void _exit() {

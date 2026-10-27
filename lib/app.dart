@@ -7,6 +7,7 @@ import 'core/constants/app_colors.dart';
 import 'core/routing/app_router.dart';
 import 'core/services/app_preferences.dart';
 import 'core/theme/app_theme.dart';
+import 'core/widgets/connectivity_banner.dart';
 
 class EduTaskApp extends ConsumerWidget {
   const EduTaskApp({super.key});
@@ -49,30 +50,40 @@ class EduTaskApp extends ConsumerWidget {
             fit: StackFit.expand,
             children: [
               safeChild,
-              if (SupabaseConfig.isNotConfigured)
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: SafeArea(
-                    // Banner hanya informasi: tidak boleh menangkap sentuhan
-                    // sehingga AppBar tetap bisa dipakai.
-                    child: IgnorePointer(
-                      child: Material(
-                        color: Colors.transparent,
-                        child: Container(
-                          color: AppColors.warningDark,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                          child: const Text(
-                            'Mode terbatas — server belum dikonfigurasi pada build ini',
-                            style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w600),
-                            textAlign: TextAlign.center,
+              // Pita informasi di atas layar: konfigurasi server yang belum
+              // lengkap dan status koneksi. Ditempatkan dalam satu kolom agar
+              // keduanya tidak saling menimpa.
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: SafeArea(
+                  bottom: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (SupabaseConfig.isNotConfigured)
+                        // Banner hanya informasi: tidak boleh menangkap sentuhan
+                        // sehingga AppBar tetap bisa dipakai.
+                        IgnorePointer(
+                          child: Material(
+                            color: Colors.transparent,
+                            child: Container(
+                              color: AppColors.warningDark,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                              child: const Text(
+                                'Mode terbatas — server belum dikonfigurasi pada build ini',
+                                style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w600),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
+                      const AppConnectivityBanner(),
+                    ],
                   ),
                 ),
+              ),
             ],
           ),
         );

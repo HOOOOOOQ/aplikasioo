@@ -43,19 +43,17 @@ class SessionResult {
   bool get requiresRelogin =>
       state == SessionState.noSession || state == SessionState.expired;
 
-  const SessionResult.ready(String token, {bool degraded = false})
+  const SessionResult.ready(String token, {this.degraded = false})
       : state = SessionState.ready,
         accessToken = token,
-        degraded = degraded,
         error = null;
 
   const SessionResult.failed(
     SessionState failedState,
     AppError failure, {
-    bool degraded = false,
+    this.degraded = false,
   })  : state = failedState,
         accessToken = null,
-        degraded = degraded,
         error = failure;
 }
 
