@@ -24,10 +24,15 @@ void main() {
       );
     });
 
-    test('label tidak pernah kosong dan mengikuti nama platform', () {
-      expect(PlatformCapabilities.label.trim(), isNotEmpty);
-      if (!PlatformCapabilities.isWeb) {
-        expect(PlatformCapabilities.label, defaultTargetPlatform.name);
+    test('label tidak pernah kosong dan mengikuti platform aktif', () {
+      final label = PlatformCapabilities.label;
+      expect(label.trim(), isNotEmpty);
+      if (PlatformCapabilities.isWeb) {
+        expect(label, 'Web');
+      } else {
+        // Label memakai kapitalisasi merek ('Android'/'iOS'); nama platform
+        // dari Flutter memakai huruf kecil, jadi perbandingan tanpa beda huruf.
+        expect(label.toLowerCase(), defaultTargetPlatform.name.toLowerCase());
       }
     });
   });
