@@ -461,16 +461,76 @@ indikator "Menyiapkan…" selama proses.
 
 ## 9. Hasil verifikasi
 
-| Pemeriksaan | Status | Catatan |
+Diuji lewat GitHub Actions pada branch `arena/860055b9-aplikasioo`, commit
+`d7edd4e` (PR #66). Tidak ada pemeriksaan di bawah ini yang dijalankan di
+laptop pengembang — semua berasal dari CI.
+
+| Pemeriksaan | Status | Hasil |
 |---|---|---|
-| Parser sintaks Dart (`lib` + `test`) | **SELESAI (lokal)** | Lihat bagian 10. |
-| Parser SQL 7 migration | **SELESAI (lokal)** | `007` lolos `pgsql-parser`. |
-| `flutter pub get` / `analyze` / `test` | menunggu CI | Dicatat setelah CI berjalan. |
-| `flutter build web --release` | menunggu CI | Job `web-build`. |
-| `flutter build apk --release` | menunggu CI | Job `build` di `build-apk.yml`. |
-| Uji di perangkat Android nyata | **BELUM TERVERIFIKASI** | Butuh perangkat. |
+| Parser sintaks Dart (`lib` + `test`) | **SELESAI (lokal)** | 145 berkas, 0 kesalahan sintaks. |
+| Parser SQL 7 migration | **SELESAI (lokal)** | 7/7 lolos `pgsql-parser`. |
+| `flutter pub get` | **TERVERIFIKASI CI** | Sukses (job `analyze-test`, `web-build`, `build`). |
+| `flutter analyze --no-fatal-infos --no-fatal-warnings` | **TERVERIFIKASI CI** | **0 error, 0 warning, 4 info** (semuanya info lama di `back_guard.dart` & `session_guard.dart`, bukan dari ronde ini). |
+| `flutter test` | **TERVERIFIKASI CI** | **204 tes lulus** (sebelumnya 162; +42 tes baru ronde ini). |
+| `flutter build web --release` | **TERVERIFIKASI CI** | Sukses (job `web-build` hijau). Pemeriksaan artefak lolos: `index.html`, `manifest.json`, `flutter_bootstrap.js`, `main.dart.js`, `flutter_service_worker.js`, ikon 192 px ada; teks `EduTask` ada di `index.html`; **tidak ada** string `service_role` di bundle. Ukuran pasti tidak ditampilkan di komentar PR (ada di log job). |
+| `flutter build apk --release` | **TERVERIFIKASI CI** | **APK build #91** sukses: universal 67 MB, arm64-v8a 27 MB, armeabi-v7a 25 MB, x86_64 28 MB; `applicationId com.edutask.sekolah`, `minSdk 24`, `targetSdk 36`, ditandatangani kunci uji yang sama (`f3d985e4…ffcbf9`). |
+| `install-test` (emulator x86_64) | **GAGAL — INFRASTRUKTUR CI** | Emulator tidak menghasilkan log smoke test (`emulator gagal boot / action gagal sebelum skrip`). Langkah ini memakai `continue-on-error`, jadi job tetap hijau, tetapi **instalasi APK belum terbukti** lewat CI. |
+| Uji pin/PDF manual di perangkat nyata | **BELUM TERVERIFIKASI** | Butuh perangkat + database live. |
 | Uji di browser nyata | **BELUM TERVERIFIKASI** | Butuh browser + Supabase live. |
 | Migration di database produksi | **BELUM DIJALANKAN** | Jalankan manual (bagian 3.1). |
+
+Detail APK build #91 (`SHA256SUMS.txt` lengkap ada di komentar PR):
+
+| File | Ukuran | SHA-256 |
+|---|---|---|
+| `EduTask-1.2.0-arm64-v8a.apk` | 27 MB | `8d09034f9d888a293ab024a27854bec7b39090f6b98c422ee5933bbf433057fb` |
+| `EduTask-1.2.0-armeabi-v7a.apk` | 25 MB | `de220c37ea94e15f1cfb61285dcbc5993e0ef9dc988095a6139ae3ea85fd8b9f` |
+| `EduTask-1.2.0-universal.apk` | 67 MB | `eea1b619dddc5f33c9e247ce6c11c0aeb4c1d4093b26db03a7e3f6d29b725003` |
+| `EduTask-1.2.0-x86_64.apk` | 28 MB | `31a0829f2ab6cf7aeca8288188c67d9ca06995ff4fe187e624d5c1a3bd3b7e69` |
+
+> APK pada build #91 adalah artefak **job CI** (bisa diunduh dari halaman run).
+> Release `latest-apk` belum diperbarui karena workflow APK hanya memublikasikan
+> release saat push ke `main` — yaitu setelah PR ini digabung.
+
+Catatan penting soal `install-test`: pada build #91 langkah emulator **gagal**
+(emulator tidak boot / action gagal sebelum skrip dijalankan) sehingga tidak ada
+bukti instalasi dari CI. Karena langkah itu `continue-on-error: true`, status
+job tetap hijau — angka "hijau" di atas **tidak** boleh dibaca sebagai bukti
+APK berjalan. Uji instalasi manual di perangkat tetap diperlukan (bagian 8).
+
+### 9.1 Bug yang ditemukan CI dan diperbaiki
+
+CI pertama (run `40437069068` / `40437069063`) gagal dan mengungkap satu bug
+nyata yang **tidak bisa dilihat dengan parser lokal**:
+
+```
+image-4.11.0/lib/src/formats/png_decoder.dart:377:39:
+Error: The method 'decodeLazy' isn't defined for the type 'ZLibDecoder'.
+ - 'ZLibDecoder' is from 'package:archive-4.0.9/...'
+```
+
+* **Akar masalah:** `pdf` membatasi `archive >=3.4.0 <4.1.0`, sedangkan
+  `image` 4.11.0 memanggil `ZLibDecoder.decodeLazy` yang baru ada di
+  `archive >=4.1.0`. Kombinasi ini lolos resolusi versi tetapi gagal saat
+  kompilasi (dart2js dan kernel test).
+* **Dampak:** `flutter build web` gagal total, dan satu berkas tes
+  (`report_pdf_builder_test`) gagal dimuat di VM sehingga 5 tes tidak berjalan.
+* **Perbaikan:** `image: '>=4.10.0 <4.11.0'` di `pubspec.yaml` (4.10.x memakai
+  `decodeBytes`, aman dengan `archive 4.0.9`). Komentar di pubspec menjelaskan
+  alasan dan kapan pin ini boleh dilepas.
+* **Bukti:** setelah pin, `analyze` 0 error, `flutter test` 204 lulus,
+  `build web` sukses, `build apk` sukses.
+
+### 9.2 Perbaikan diagnosa CI
+
+Agar kegagalan berikutnya tidak perlu menebak, `verify.yml` sekarang:
+
+* menulis ringkasan blok `[E]` dari `flutter test` ke komentar PR
+  (`### Tes yang gagal (ringkas)`),
+* menulis 12 KB terakhir log `flutter build web` ke komentar PR
+  (`### Kegagalan flutter build web`),
+* memakai komentar terpisah (bukan `--edit-last`) supaya job `analyze-test` dan
+  `web-build` tidak saling menimpa komentar.
 
 ---
 
@@ -490,8 +550,9 @@ di lokal dan baru terlihat di CI.
 
 ## 11. Risiko & batasan yang diketahui
 
-1. Migration belum dijalankan → tombol pin akan gagal (`P0002`/`42501`) sampai
-   SQL dijalankan; UI menampilkan pesan error, bukan diam.
+1. Migration **belum dijalankan** → tombol pin akan gagal (`P0002`/`42501`)
+   sampai SQL dijalankan; UI menampilkan pesan error, bukan diam. Fitur PDF
+   tidak bergantung pada migration dan sudah lolos build di CI.
 2. Bila `position` diubah manual di luar aplikasi hingga melebihi 1.000.000,
    constraint `check_tugas_position` menolak (data lama tidak terpengaruh
    karena `NOT VALID`).
