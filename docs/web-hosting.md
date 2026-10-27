@@ -73,6 +73,7 @@ tidak memicu build.
 | `Resource not accessible by integration` pada langkah *Setup Pages* | Token CI tidak boleh mengaktifkan Pages | Settings → Pages → Source: **GitHub Actions**, lalu jalankan ulang workflow |
 | `Secret SUPABASE_URL dan/atau SUPABASE_ANON_KEY belum diatur` | Secret belum ada / salah nama | Tambahkan di Settings → Secrets and variables → Actions |
 | Halaman terbuka tapi layar putih | `base-href` salah (mis. disajikan di sub-path lain) | Pastikan Pages menyajikan dari `/<repo>/`; `--base-href` dihitung otomatis dari nama repo |
+| `Couldn't find the placeholder for base href` | `<base href>` di `web/index.html` diisi nilai tetap | Biarkan `<base href="$FLUTTER_BASE_HREF">` (placeholder) |
 | Login gagal padahal APP jalan | Secret menunjuk project Supabase yang berbeda dengan APK | Samakan `SUPABASE_URL` dengan project yang dipakai build APK |
 | Halaman 404 dirasa kasar | `web/404.html` dipakai apa adanya | Ubah berkas itu bila perlu; ikut tersalin saat build |
 

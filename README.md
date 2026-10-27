@@ -143,6 +143,10 @@ Catatan:
   Server pengembangan hanya mengikat `127.0.0.1` secara default; `WEB_HOST=0.0.0.0`
   membuatnya bisa diakses dari HP di Wi-Fi yang sama — jangan dipakai di jaringan
   publik karena `flutter run -d web-server` tidak punya autentikasi.
+- **Base href**: `web/index.html` sengaja memakai placeholder
+  `<base href="$FLUTTER_BASE_HREF">` (jangan diganti nilai tetap) supaya
+  `flutter build web --base-href=/…/` bekerja untuk hosting di sub-path seperti
+  GitHub Pages. Tanpa `--base-href`, nilainya menjadi `/`.
 - **URL**: default memakai *hash strategy* (`http://localhost:8080/#/admin`) agar
   refresh/Back bekerja di semua static server tanpa rewrite. Untuk URL bersih
   (`/admin`) build ulang dengan `--dart-define=USE_PATH_URL_STRATEGY=true` dan
