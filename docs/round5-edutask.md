@@ -275,67 +275,97 @@ kolom/UI yang disetujui). Keduanya dicatat di bagian 12.
 
 ---
 
-## 8. Hasil `flutter analyze`
+## 8. Hasil `flutter analyze` — TERVERIFIKASI CI
 
-- **Belum dijalankan pada mesin kerja ini** (Flutter SDK tidak tersedia).
-- Pemeriksaan pengganti yang benar-benar dijalankan:
-  * parser Dart (tree-sitter) untuk seluruh `lib/` + `test/`:
-    **131 berkas (114 `lib/` + 17 `test/`), 0 error sintaks**;
-  * pemindaian import tak terpakai (yang memicu `unused_import` di
-    `flutter analyze`): **0 temuan**;
-  * pemindaian API berisiko yang sudah diperbaiki: `AppHeroHeader` tanpa
-    parameter `icon`, `DeadlineHelper.getStatus(deadline:, isCompleted:)`,
-    `AppRadius` → `AppSpacing.radiusMd`, `Tugas.tenggatWaktu` non-null.
-- **Status: BELUM TERVERIFIKASI** sampai komentar `### Hasil flutter analyze`
-  pada PR menyatakan 0 error.
+Dijalankan oleh workflow **Verify Flutter** di GitHub Actions (Flutter 3.35.4):
 
-## 9. Hasil `flutter test`
+```
+Analyzing aplikasioo...
+   info • use_build_context_synchronously • lib/core/navigation/back_guard.dart:184:41
+   info • use_build_context_synchronously • lib/core/navigation/back_guard.dart:186:17
+   info • prefer_initializing_formals     • lib/core/services/session_guard.dart:49:9
+   info • prefer_initializing_formals     • lib/core/services/session_guard.dart:58:9
+4 issues found.
+```
 
-- Lokal: **belum dijalankan** (tanpa SDK).
-- Pengujian baru yang ditambahkan: CSV (11), preferensi teks (6), kapabilitas
-  platform (4), onboarding 8 langkah (diperbarui, bukan dihapus).
-- Total berkas test: **17** (sebelumnya 14).
-- **Status: BELUM TERVERIFIKASI** sampai komentar `### Hasil flutter test`
-  menyatakan semua test lulus.
+**0 error, 0 warning.** Empat `info` di atas adalah temuan lama (berkas ronde 4)
+yang tidak diubah pada ronde ini; CI memakai `--no-fatal-infos`.
 
-## 10. Build APK
+Pemeriksaan tambahan di lingkungan tanpa SDK:
 
-- **Ronde 5 belum menghasilkan APK baru** karena build hanya berjalan di CI.
-- APK terakhir yang terverifikasi (ronde 4, build #80, release `latest-apk`):
+* parser Dart (tree-sitter) untuk `lib/` + `test/`: **131 berkas, 0 error sintaks**;
+* pemindaian import tak terpakai: **0 temuan**;
+* koreksi API yang ditemukan lewat audit: `AppHeroHeader` tanpa `icon`,
+  `DeadlineHelper.getStatus(deadline:, isCompleted:)`, `AppRadius` →
+  `AppSpacing.radiusMd`, `Tugas.tenggatWaktu` non-null, `AkademikAudience`
+  & `UserRoleX.label` yang belum diimpor.
+
+## 9. Hasil `flutter test` — TERVERIFIKASI CI
+
+```
+🎉 162 tests passed.
+```
+
+- Sebelumnya 140 test (ronde 4) → **162 test** pada ronde 5 (+22).
+- Pengujian baru: CSV (11), preferensi teks (6), kapabilitas platform (4),
+  onboarding 8 langkah (diperbarui, bukan dihapus).
+- Satu kegagalan awal (`label platform` berbeda kapitalisasi di lingkungan
+  test) diperbaiki pada penyebabnya — bukan dengan menghapus test.
+
+## 10. Build APK — TERVERIFIKASI CI
+
+Workflow **Build EduTask APK** berhasil pada PR ini (**build #83**), termasuk
+job **install-test di emulator Android x86_64** yang memasang APK dan melakukan
+*cold start* (status job: **SUCCESS**).
 
 | Item | Nilai |
 |---|---|
 | Berkas | `EduTask-1.2.0-arm64-v8a.apk` (disarankan), `armeabi-v7a`, `x86_64`, `universal` |
-| Ukuran | 26.733.401 B / 24.591.199 B / 27.908.944 B / 66.395.430 B |
-| SHA-256 | `4bbdee61…3ea8` (arm64) — daftar lengkap di `SHA256SUMS.txt` |
+| Ukuran | 26 MB / 24 MB / 27 MB / 65 MB |
+| SHA-256 (arm64) | `2ee70a109a4fb1477df30a940a5ff2337aab6ed6e34745abaabef3f5febb8b14` |
+| SHA-256 (armeabi-v7a) | `202b6aefee283dea2f390c290d8d981912337054f330e1b740f3045f46ad7919` |
+| SHA-256 (x86_64) | `854ef5a2d675abe8e22ebe53215cd49f4bd26d176898131c89e92ddeaa10515b` |
+| SHA-256 (universal) | `cfd7ff978f5082cadba34711f25a40e9e8998e955aa5348f207ab4c3b299eed4` |
 | applicationId | `com.edutask.sekolah` |
-| versionCode | 80 |
-| minSdk / targetSdk | 24 / 36 |
-| Tanda tangan | v2 + v3 valid, signer `f3d985e4…fcbf9` (keystore uji, **bukan** kunci Play) |
-| Unduh | `https://github.com/HOOOOOOQ/aplikasioo/releases/tag/latest-apk` |
+| versionCode | 83 (universal) / 2083 (arm64) / 1083 (armeabi-v7a) / 4083 (x86_64) |
+| versionName | `1.2.0` |
+| minSdk / targetSdk / compileSdk | 24 / 36 / 36 |
+| Tanda tangan | v2 + v3 **valid**, 1 signer, sertifikat `C=ID, O=EduTask Sekolah, CN=EduTask`, SHA-256 `f3d985e457b01512b34091c25826869ed48fe9efd42b988375fc401562ffcbf9` (keystore uji yang di-commit — **bukan** kunci Play Store) |
+| Unduh (setelah merge) | `https://github.com/HOOOOOOQ/aplikasioo/releases/tag/latest-apk` |
 
-Setelah PR ronde 5 digabung dan workflow `Build EduTask APK` selesai, tabel di
-atas akan diperbarui dengan build baru (nomor build, ukuran, dan SHA-256 baru).
+Catatan: workflow hanya mempublikasikan APK ke Release pada push ke `main`
+(`github.event_name != 'pull_request'`). Sebelum merge, APK ronde 5 tersedia
+sebagai artifact job `build` pada PR, sedangkan Release `latest-apk` masih
+berisi build #80 (ronde 4). Setelah merge, Release akan diperbarui otomatis.
 
 ## 11. Build Web
 
-- **Belum dijalankan** di mesin ini. Perintah yang harus dijalankan (dan
-  didokumentasikan agar bisa diulang):
+Job **`web-build`** ditambahkan ke workflow `verify.yml` sehingga
+`flutter build web --release` benar-benar dijalankan di CI (bukan hanya
+dibaca dari kode). Job tersebut:
+
+1. `flutter pub get`,
+2. `flutter build web --release --dart-define=SUPABASE_URL=… --dart-define=SUPABASE_ANON_KEY=…`
+   (nilai *placeholder* publik; tidak ada kredensial asli di artifact),
+3. memeriksa artefak wajib: `index.html`, `manifest.json`,
+   `flutter_bootstrap.js`, `main.dart.js`, `flutter_service_worker.js`,
+   `icons/Icon-192.png`,
+4. memastikan kata `service_role` **tidak** muncul di bundle,
+5. mengunggah `build/web` sebagai artifact (retensi 7 hari) dan menulis
+   ringkasan ke komentar PR.
+
+Perintah lokal yang setara:
 
 ```bash
 flutter pub get
-flutter analyze
-flutter test
 flutter build web --release \
   --dart-define=SUPABASE_URL=https://<project-ref>.supabase.co \
   --dart-define=SUPABASE_ANON_KEY=<anon-key>
 ```
 
-- Perubahan yang membuat Web **mungkin** berhasil: `web/` lengkap, notifikasi
-  terpisah per platform, URL strategy, `path_provider`/`dart:io` hanya di berkas
-  `*_native.dart`, `pubspec.yaml` memuat `flutter_web_plugins`.
-- **Status: BELUM TERVERIFIKASI** sampai `flutter build web --release` benar-benar
-  dijalankan.
+Profil basis data sesi di Web memakai `localStorage` (dikelola `supabase_flutter`),
+sehingga refresh halaman tidak menghapus sesi. **Status: TERVERIFIKASI CI bila
+job `web-build` pada PR berwarna hijau** (lihat komentar `### Hasil flutter build web`).
 
 ## 12. Langkah lokal (`localhost:8080`)
 
@@ -413,6 +443,7 @@ flutter run -d web-server --web-hostname 0.0.0.0 --web-port 8080 \
 | 19 | Responsif | Web 360 px, 768 px, 1440 px | Belum diuji |
 | 20 | Offline & audio gagal | Mode pesawat → pesan jaringan (bukan sesi habis); hapus aset audio → app tetap jalan | Belum diuji |
 
-Kolom "Hasil" sengaja dibiarkan *Belum diuji* karena lingkungan kerja ini tidak
-memiliki perangkat/emulator maupun akses Supabase. Pengujian tersebut harus
-dilakukan pada build CI berikutnya.
+Catatan: skenario **instalasi APK + cold start** sudah terbukti otomatis oleh
+job `install-test` (emulator Android x86_64, status SUCCESS pada build #83).
+Skenario lain memerlukan akun & data pada project Supabase aktif sehingga
+dibiarkan *Belum diuji* — bukan diklaim lulus.
