@@ -2,11 +2,16 @@
 <html lang="id">
 <head>
   <!--
-    Base href "/" cocok untuk flutter run -d web-server dan untuk hosting di root
-    domain. Bila Web disajikan di sub-path (mis. https://contoh.id/edutask/),
-    build dengan: flutter build web --base-href=/edutask/
+    JANGAN diganti dengan nilai tetap: harus tetap placeholder $FLUTTER_BASE_HREF
+    agar `flutter build web --base-href=...` bisa bekerja (kalau diganti, build
+    gagal dengan "Couldn't find the placeholder for base href").
+
+    Nilainya diisi Flutter saat build:
+      - flutter run -d web-server / hosting di akar domain  -> "/"
+      - sub-path, mis. GitHub Pages https://<user>.github.io/aplikasioo/
+        -> flutter build web --base-href=/aplikasioo/
   -->
-  <base href="/">
+  <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">

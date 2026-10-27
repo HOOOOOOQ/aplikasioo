@@ -143,6 +143,10 @@ Catatan:
   Server pengembangan hanya mengikat `127.0.0.1` secara default; `WEB_HOST=0.0.0.0`
   membuatnya bisa diakses dari HP di Wi-Fi yang sama — jangan dipakai di jaringan
   publik karena `flutter run -d web-server` tidak punya autentikasi.
+- **Base href**: `web/index.html` sengaja memakai placeholder
+  `<base href="$FLUTTER_BASE_HREF">` (jangan diganti nilai tetap) supaya
+  `flutter build web --base-href=/…/` bekerja untuk hosting di sub-path seperti
+  GitHub Pages. Tanpa `--base-href`, nilainya menjadi `/`.
 - **URL**: default memakai *hash strategy* (`http://localhost:8080/#/admin`) agar
   refresh/Back bekerja di semua static server tanpa rewrite. Untuk URL bersih
   (`/admin`) build ulang dengan `--dart-define=USE_PATH_URL_STRATEGY=true` dan
@@ -156,6 +160,29 @@ Catatan:
 - **Produksi**: sajikan `build/web` lewat HTTPS. Untuk hosting statis (Netlify /
   Cloudflare Pages) salin `web/_redirects`; untuk Nginx gunakan
   `try_files $uri $uri/ /index.html;` bila memakai path strategy.
+
+### Publikasi Web otomatis (GitHub Pages)
+
+Versi Web juga diterbitkan otomatis dari `main` oleh
+`.github/workflows/deploy-web.yml`, sehingga bisa dicoba tanpa memasang Flutter:
+
+**https://hooooooq.github.io/aplikasioo/**
+
+| Hal | Keterangan |
+|---|---|
+| Sumber kredensial | Repository secrets `SUPABASE_URL` + `SUPABASE_ANON_KEY` (anon key memang publik; data dilindungi RLS) |
+| Pemicu | Push ke `main` yang menyentuh `lib/`, `web/`, `pubspec.*`, atau workflow ini; bisa juga manual lewat *Run workflow* |
+| PR | Tetap dibangun (tanpa deploy) supaya kesalahan build web terlihat sebelum digabung |
+| Base href | Otomatis `/<nama-repo>/` (atau `/` untuk repo `<user>.github.io`) |
+| Pemeriksaan | `service_role` tidak boleh muncul di bundle — job gagal bila ditemukan |
+
+Sifat situs ini **publik**, sama seperti APK di release `latest-apk`. Isi
+aplikasi tetap memerlukan akun karena login dan data berada di Supabase yang
+dilindungi RLS.
+
+Bila job `deploy` gagal dengan pesan *Resource not accessible by integration*,
+aktifkan sekali secara manual: **Settings → Pages → Source: GitHub Actions**,
+lalu jalankan ulang workflow. Panduan lengkap: [`docs/web-hosting.md`](docs/web-hosting.md).
 
 ## Backend
 

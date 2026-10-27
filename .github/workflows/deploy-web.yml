@@ -1,0 +1,208 @@
+name: Deploy Web (GitHub Pages)
+
+# Membangun ulang versi Web dari kode yang sama dengan Android, lalu
+# menerbitkannya sebagai situs statis di GitHub Pages:
+#   https://<pemilik>.github.io/<repo>/
+#
+# Kredensial Supabase diambil dari repository secrets `SUPABASE_URL` dan
+# `SUPABASE_ANON_KEY` (anon key memang publik; data dilindungi RLS).
+# `service_role` tidak pernah dipakai dan sengaja tidak didukung.
+#
+# Catatan penting:
+#  * Halaman hanya berisi shell aplikasi (HTML/JS). Login dan data tetap di
+#    Supabase; tanpa akun, isi aplikasi tidak bisa dibuka.
+#  * Situs ini PUBLIK seperti halnya APK di release `latest-apk`.
+#  * Kalau job `deploy` gagal dengan "Resource not accessible by integration",
+#    aktifkan sekali secara manual: Settings → Pages → Source: GitHub Actions.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'lib/**'
+      - 'web/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/deploy-web.yml'
+  pull_request:
+    branches: [main]
+    # PR hanya membangun (tanpa deploy) agar kesalahan build web terlihat
+    # sebelum digabung.
+    paths:
+      - 'lib/**'
+      - 'web/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/deploy-web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  # Diperlukan agar ringkasan kegagalan bisa dikirim sebagai komentar PR.
+  pull-requests: write
+
+# Deploy tidak boleh berjalan bersamaan; yang terbaru menang.
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter 3.35.4
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.4'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Cek kredensial Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+            echo "::error::Secret SUPABASE_URL dan/atau SUPABASE_ANON_KEY belum diatur."
+            echo "Tambahkan di: Settings → Secrets and variables → Actions."
+            echo "Tanpa nilai itu, build web akan menghasilkan aplikasi yang tidak bisa login."
+            exit 1
+          fi
+          case "$SUPABASE_URL" in
+            https://*) ;;
+            *) echo "::error::SUPABASE_URL harus diawali https://"; exit 1 ;;
+          esac
+          echo "SUPABASE_URL terisi (${#SUPABASE_URL} karakter), anon key terisi (${#SUPABASE_ANON_KEY} karakter)."
+
+      # Base href mengikuti sub-path repo. Untuk repo bernama
+      # "<user>.github.io" situs berada di akar, jadi base href menjadi "/".
+      - name: Tentukan base href
+        id: base
+        run: |
+          set -euo pipefail
+          REPO="${GITHUB_REPOSITORY#*/}"
+          if [ "$REPO" = "${GITHUB_REPOSITORY_OWNER}.github.io" ]; then
+            echo "value=/" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=/${REPO}/" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Base href: $(grep '^value=' "$GITHUB_OUTPUT" | cut -d= -f2-)"
+
+      - name: Build web (release)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          BASE_HREF: ${{ steps.base.outputs.value }}
+        run: |
+          set -o pipefail
+          : "${BASE_HREF:=/}"
+          echo "[build] base href: $BASE_HREF"
+          # Anon key tidak pernah dicetak ke log.
+          {
+            echo "[build] flutter build web --release --base-href=$BASE_HREF"
+            echo "[build] --dart-define=SUPABASE_URL=(terisi, ${#SUPABASE_URL} karakter)"
+            echo "[build] --dart-define=SUPABASE_ANON_KEY=(disembunyikan, ${#SUPABASE_ANON_KEY} karakter)"
+          } | tee web-deploy-build.log
+          flutter build web --release \
+            "--base-href=$BASE_HREF" \
+            "--dart-define=SUPABASE_URL=$SUPABASE_URL" \
+            "--dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" \
+            2>&1 | tee -a web-deploy-build.log
+
+      # Kegagalan build web di sini sulit didiagnosis dari luar CI (log mentah
+      # tidak selalu bisa diunduh), jadi ringkasannya dikirim ke PR.
+      - name: Ringkasan kegagalan build web
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ ! -f web-deploy-build.log ]; then exit 0; fi
+          {
+            echo '### Kegagalan `flutter build web` (GitHub Pages)'
+            echo
+            echo '```'
+            tail -c 12000 web-deploy-build.log
+            echo '```'
+          } > web-deploy-fail.md
+          cat web-deploy-fail.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "${PR:-}" ]; then
+            gh pr comment "$PR" --body-file web-deploy-fail.md || true
+          fi
+
+      - name: Verifikasi artefak web
+        run: |
+          set -e
+          test -f build/web/index.html
+          test -f build/web/main.dart.js
+          test -f build/web/manifest.json
+          test -f build/web/flutter_bootstrap.js
+          test -f build/web/404.html
+          grep -q "EduTask" build/web/index.html
+          # Jangan pernah menerbitkan kunci rahasia ke internet.
+          if grep -rIl "service_role" build/web; then
+            echo "::error::kata service_role ditemukan di build web"
+            exit 1
+          fi
+          echo "Ukuran build/web: $(du -sh build/web | cut -f1) / $(find build/web -type f | wc -l) berkas"
+
+      - name: Upload artefak build (untuk diperiksa di PR)
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build-pr
+          path: build/web
+          retention-days: 7
+
+      - name: Upload artefak Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+        with:
+          # Mencoba mengaktifkan Pages otomatis bila belum pernah diaktifkan.
+          # Bila token tidak berizin, aktifkan manual: Settings → Pages →
+          # Source: GitHub Actions.
+          enablement: true
+
+      - name: Deploy ke GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Ringkasan
+        run: |
+          {
+            echo "### Web EduTask diterbitkan"
+            echo
+            echo "- URL: ${{ steps.deployment.outputs.page_url }}"
+            echo "- Commit: \`${GITHUB_SHA:0:7}\`"
+            echo "- Build: [run #${GITHUB_RUN_NUMBER}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
+            echo
+            echo "Halaman bersifat publik, tetapi login & data tetap di Supabase"
+            echo "(dilindungi RLS). Diperlukan akun untuk membuka isi aplikasi."
+          } >> "$GITHUB_STEP_SUMMARY"
