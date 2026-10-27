@@ -67,6 +67,43 @@ flutter analyze
 flutter test
 ```
 
+## Menjalankan di Web (Flutter Web)
+
+Target Web memakai kode yang sama dengan Android. Perbedaan platform ditangani
+lewat *conditional import* (`lib/core/routing/url_strategy*.dart`,
+`lib/features/notifications/notification_backend_*.dart`,
+`lib/core/services/csv_saver*.dart`), sehingga tidak ada plugin Android yang
+dipanggil di browser.
+
+```bash
+# 1) Jalankan mode pengembangan di http://localhost:8080
+flutter pub get
+flutter run -d web-server --web-hostname 0.0.0.0 --web-port 8080 \
+  --dart-define=SUPABASE_URL=https://<project-ref>.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=<anon-key>
+
+# 2) Build rilis (folder build/web)
+flutter build web --release \
+  --dart-define=SUPABASE_URL=https://<project-ref>.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=<anon-key>
+```
+
+Catatan:
+
+- **URL**: default memakai *hash strategy* (`http://localhost:8080/#/admin`) agar
+  refresh/Back bekerja di semua static server tanpa rewrite. Untuk URL bersih
+  (`/admin`) build ulang dengan `--dart-define=USE_PATH_URL_STRATEGY=true` dan
+  pastikan host mengarahkan semua rute ke `index.html` (lihat `web/_redirects`).
+- **Notifikasi lokal**: hanya tersedia di Android. Di Web tombolnya dinonaktifkan
+  dengan penjelasan, sedangkan pusat notifikasi in-app tetap berfungsi.
+- **Suara pembuka**: browser dapat memblokir audio otomatis (*autoplay policy*).
+  Jika diblokir, aplikasi tetap berjalan tanpa suara - tidak ada error ke pengguna.
+- **Ekspor CSV**: di Web memakai "Salin CSV" ke papan klip; di Android berkas
+  ditulis ke direktori sementara aplikasi.
+- **Produksi**: sajikan `build/web` lewat HTTPS. Untuk hosting statis (Netlify /
+  Cloudflare Pages) salin `web/_redirects`; untuk Nginx gunakan
+  `try_files $uri $uri/ /index.html;` bila memakai path strategy.
+
 ## Backend
 
 ### Migrasi (jalankan berurutan di SQL Editor / `supabase db push`)
@@ -78,6 +115,7 @@ flutter test
 | `supabase/migrations/003_storage_attachments.sql` | Bucket **privat** `lampiran-tugas`, policy Storage lengkap, path `tugas/<guru_id>/<tugas_id>/<file>` |
 | `supabase/migrations/004_access_codes_audit.sql` | `kode_akses_siswa`, `siswa_akun`, `kode_akses_attempt`, `audit_log` + trigger, RPC `claim_kode_akses` |
 | `supabase/migrations/005_access_codes_schema_repair.sql` | **Perbaikan idempoten**: tabel/kolom/FK/index/policy kode akses yang belum ada, RPC `kode_akses_stats()` (statistik dashboard), `edutask_schema_health()` (diagnostik admin), `notify pgrst 'reload schema'` |
+| `supabase/migrations/006_round4_academic_chat.sql` | Idempotency kode akses (`idempotency_key`), pengumuman, kalender, pengumpulan tugas + revisi + nilai, diskusi, chat privat/grup/diskusi, pusat notifikasi, RPC pencarian & statistik, riwayat kode akses |
 
 > **Penting (round 3):** `005` aman dijalankan berulang kali dan tidak menghapus data.
 > Jalankan bila aplikasi menampilkan *"Could not find the table 'public.kode_akses_siswa'
@@ -92,12 +130,16 @@ flutter test
 | `student-access` | tidak | Verifikasi kode akses siswa, rate limit, klaim atomik |
 | `student-codes` | ya | Terbitkan/cabut kode akses (admin/guru) |
 | `update-student-task-status` | tidak | Tandai tugas selesai dengan token siswa (HMAC); kode error `student_token_*` |
+| `student-portal` | tidak | Portal siswa bertoken: pengumuman, kalender, tugas, pengumpulan, notifikasi |
+| `student-chat` | tidak | Chat siswa bertoken: thread, pesan, guru kelas (`guru_list`), unread |
 
 ```bash
 supabase functions deploy create-teacher
 supabase functions deploy student-access
 supabase functions deploy student-codes
 supabase functions deploy update-student-task-status
+supabase functions deploy student-portal
+supabase functions deploy student-chat
 ```
 
 Urutan aman: **deploy function → jalankan 003 → jalankan 004 → jalankan 005**.
@@ -125,8 +167,9 @@ lib/
 supabase/
   migrations/  skema + policy + trigger
   functions/   Edge Functions (Deno)
+web/           index.html, manifest PWA, ikon, fallback SPA
 test/          unit test murni (tanpa jaringan)
-docs/          laporan ronde 2 & panduan instalasi APK
+docs/          laporan ronde 2-5 & panduan instalasi APK
 ```
 
 ## Tim
