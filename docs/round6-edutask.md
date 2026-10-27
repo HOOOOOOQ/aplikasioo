@@ -329,9 +329,13 @@ hanya karena admin mem-pin sesuatu.
 |---|---|---|
 | Admin | Ya (semua tugas) | Diizinkan (policy `Admin manage tugas` + cek `is_admin()`). |
 | Guru pemilik | Ya | Diizinkan (policy `Guru manage own tugas` + cek `is_guru()` & `guru_id = auth.uid()`). |
-| Guru lain | Tidak | Ditolak `42501`. |
+| Guru lain | Tidak | Ditolak `42501` bila barisnya terlihat, atau `P0002` bila RLS menyembunyikan baris tersebut. |
 | Siswa | Tidak | Ditolak `42501` (tidak ada policy UPDATE pada `tugas`). |
 | Anon | Tidak | Ditolak `42501` (`auth.uid()` null). |
+
+`AppError` menerjemahkan `42501` → “Akses ditolak”, `P0002` → “Data tidak
+ditemukan”, dan `22023` → “Data tidak valid”, sehingga pengguna tidak melihat
+kode mentah PostgREST.
 
 `TugasPinPolicy` hanya menyaring UI. **Keamanan ada di server**: RLS `tugas`
 yang sudah ada + pemeriksaan ulang di dalam `set_tugas_pin`. UI tersembunyi

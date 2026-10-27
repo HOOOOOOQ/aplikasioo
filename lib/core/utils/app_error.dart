@@ -173,6 +173,19 @@ class AppError {
           message: 'Data yang diminta sudah tidak ada atau belum tersedia.',
           code: 'not_found',
         );
+      case 'P0002':
+        return AppError(
+          title: 'Data tidak ditemukan',
+          message: _clean(e.message),
+          hint: 'Muat ulang halaman lalu coba lagi.',
+          code: 'not_found',
+        );
+      case '22023':
+        return AppError(
+          title: 'Data tidak valid',
+          message: _clean(e.message),
+          code: 'invalid_input',
+        );
       case 'P0001':
         return AppError(
           title: 'Operasi ditolak server',

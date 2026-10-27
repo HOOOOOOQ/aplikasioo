@@ -95,6 +95,43 @@ void main() {
     });
   });
 
+  group('Round 6: pin tugas (RPC set_tugas_pin)', () {
+    test('P0002 tugas tidak ditemukan memakai pesan server, bukan kode mentah', () {
+      final e = AppError.from(
+        PostgrestException(
+          message: 'Tugas tidak ditemukan atau tidak dapat diakses oleh akun ini.',
+          code: 'P0002',
+        ),
+      );
+      expect(e.code, 'not_found');
+      expect(e.title, 'Data tidak ditemukan');
+      expect(e.message, contains('Tugas tidak ditemukan'));
+      expect(e.shortMessage.contains('P0002'), isFalse);
+    });
+
+    test('22023 payload pin tidak valid dijelaskan sebagai data tidak valid', () {
+      final e = AppError.from(
+        PostgrestException(
+          message: 'Permintaan pin tidak valid: p_pinned wajib true atau false.',
+          code: '22023',
+        ),
+      );
+      expect(e.code, 'invalid_input');
+      expect(e.title, 'Data tidak valid');
+    });
+
+    test('penolakan RLS pin (42501) tidak membocorkan detail SQL', () {
+      final e = AppError.from(
+        PostgrestException(
+          message: 'Akses ditolak: hanya admin atau guru pemilik tugas yang boleh mengubah pin.',
+          code: '42501',
+        ),
+      );
+      expect(e.code, 'rls_denied');
+      expect(e.shortMessage.toLowerCase().contains('row-level security'), isFalse);
+    });
+  });
+
   group('Round 3: skema & sesi', () {
     test('PGRST205 (tabel tidak ada di schema cache) -> schema_not_ready', () {
       final e = AppError.from(

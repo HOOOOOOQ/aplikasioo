@@ -90,27 +90,28 @@ declare
   v_position integer;
 begin
   if v_uid is null then
-    raise exception 'forbidden' using errcode = '42501',
-      hint = 'Permintaan harus memakai sesi login (admin atau guru).';
+    raise exception 'Akses ditolak: permintaan harus memakai sesi login.'
+      using errcode = '42501',
+      hint = 'Masuk sebagai admin atau guru pemilik tugas.';
   end if;
 
   if p_pinned is null then
-    raise exception 'invalid_payload' using errcode = '22023',
-      hint = 'p_pinned wajib bernilai true atau false.';
+    raise exception 'Permintaan pin tidak valid: p_pinned wajib true atau false.'
+      using errcode = '22023';
   end if;
 
   -- Baca baris target. Bila RLS tidak mengizinkan, baris tidak terlihat dan
   -- fungsi berhenti dengan pesan yang jelas (bukan diam-diam sukses).
   select * into v_row from public.tugas where id = p_tugas_id;
   if not found then
-    raise exception 'not_found' using errcode = 'P0002',
-      hint = 'Tugas tidak ditemukan atau tidak dapat diakses oleh akun ini.';
+    raise exception 'Tugas tidak ditemukan atau tidak dapat diakses oleh akun ini.'
+      using errcode = 'P0002';
   end if;
 
   -- Pemeriksaan ulang otorisasi di sisi server (bukan hanya RLS).
   if not (public.is_admin() or (public.is_guru() and v_row.guru_id = v_uid)) then
-    raise exception 'forbidden' using errcode = '42501',
-      hint = 'Hanya admin atau guru pemilik tugas yang boleh mengubah pin.';
+    raise exception 'Akses ditolak: hanya admin atau guru pemilik tugas yang boleh mengubah pin.'
+      using errcode = '42501';
   end if;
 
   if p_pinned then
@@ -141,8 +142,8 @@ begin
   -- FOUND = false. Keduanya diperiksa agar kegagalan RLS tidak pernah
   -- dilaporkan sebagai sukses.
   if not found or v_row.id is null then
-    raise exception 'forbidden' using errcode = '42501',
-      hint = 'Perubahan ditolak oleh kebijakan keamanan baris.';
+    raise exception 'Perubahan ditolak oleh kebijakan keamanan baris.'
+      using errcode = '42501';
   end if;
 
   return v_row;
