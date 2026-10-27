@@ -89,3 +89,84 @@ jobs:
             echo '```'
           } > test-comment.md
           gh pr comment "$PR" --body-file test-comment.md
+
+  # Build Web benar-benar dijalankan agar klaim "Flutter Web berjalan" tidak
+  # hanya berdasarkan pembacaan kode. Nilai SUPABASE_* di bawah adalah
+  # placeholder publik untuk menguji jalur konfigurasi; TIDAK ada kredensial
+  # asli di artifact.
+  web-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter 3.35.4
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.4'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build web (release)
+        run: |
+          set -o pipefail
+          flutter build web --release \
+            --dart-define=SUPABASE_URL=https://placeholder.supabase.co \
+            --dart-define=SUPABASE_ANON_KEY=placeholder-anon-key \
+            2>&1 | tee web-build.log
+
+      - name: Verifikasi artefak web
+        run: |
+          set -e
+          exec > >(tee web-verify.log) 2>&1
+          test -f build/web/index.html
+          test -f build/web/manifest.json
+          test -f build/web/flutter_bootstrap.js
+          test -f build/web/main.dart.js
+          test -f build/web/flutter_service_worker.js
+          test -f build/web/icons/Icon-192.png
+          grep -q "EduTask" build/web/index.html
+          # Tidak boleh ada service_role / JWT asli di bundle.
+          if grep -rIl "service_role" build/web; then
+            echo "::error::kata service_role ditemukan di build web"
+            exit 1
+          fi
+          echo "Ukuran build/web:" && du -sh build/web
+          echo "Jumlah berkas:" && find build/web -type f | wc -l
+          find build/web -maxdepth 1 -type f -printf '%f\n' | sort
+
+      - name: Publikasikan hasil build web ke PR
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo '### Hasil `flutter build web`'
+            echo
+            echo '```'
+            if [ -f web-build.log ]; then tail -c 8000 web-build.log; else echo 'log tidak tersedia'; fi
+            echo '```'
+          } > web-comment.md
+          {
+            echo
+            echo '**Pemeriksaan artefak:**'
+            echo
+            echo '```'
+            if [ -f web-verify.log ]; then cat web-verify.log; else echo 'log verifikasi tidak tersedia'; fi
+            echo '```'
+          } >> web-comment.md
+          gh pr comment "$PR" --body-file web-comment.md --edit-last \
+            || gh pr comment "$PR" --body-file web-comment.md
+
+      - name: Unggah artifact build web
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: edutask-web-${{ github.run_number }}
+          path: build/web
+          retention-days: 7

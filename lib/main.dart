@@ -5,61 +5,74 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:timezone/data/latest.dart' as tz;
+
 import 'app.dart';
 import 'core/config/supabase_config.dart';
+import 'core/routing/url_strategy.dart';
+import 'core/services/platform_capabilities.dart';
 import 'features/notifications/notification_service.dart';
 
-void main() {
-  // Bungkus seluruh startup dalam runZonedGuarded agar async uncaught juga tertangkap
+/// Titik masuk aplikasi (Android & Web).
+///
+/// Semua langkah startup bersifat "gagal-aman": kesalahan konfigurasi atau
+/// plugin tidak boleh membuat aplikasi berhenti sebelum UI tampil. Bila
+/// Supabase tidak dapat diinisialisasi, aplikasi tetap berjalan dan menampilkan
+/// penjelasan di splash/login (bukan layar putih).
+Future<void> main() async {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
 
-    // Tangkap semua error framework
     FlutterError.onError = (details) {
       FlutterError.presentError(details);
-      debugPrint('[FlutterError] ${details.exception} ${details.stack}');
+      debugPrint('[FlutterError] ${details.exception}');
     };
     PlatformDispatcher.instance.onError = (error, stack) {
-      debugPrint('[PlatformDispatcher] $error $stack');
-      return true; // jangan crash
+      debugPrint('[PlatformDispatcher] $error');
+      return true;
     };
 
-    // Jangan biarkan error formatter / timezone bikin FC
+    // URL Web: default hash strategy (aman di semua host). Path strategy hanya
+    // bila diminta eksplisit lewat --dart-define=USE_PATH_URL_STRATEGY=true.
+    configureUrlStrategy(
+      usePathStrategy: const bool.fromEnvironment('USE_PATH_URL_STRATEGY'),
+    );
+
     try {
       await initializeDateFormatting('id_ID', null);
     } catch (e) {
       debugPrint('initializeDateFormatting gagal: $e');
     }
-    try {
-      tz.initializeTimeZones();
-    } catch (e) {
-      debugPrint('tz init gagal: $e');
-    }
 
-    // Init Supabase jika configured — jangan crash jika gagal
     if (SupabaseConfig.isConfigured) {
       try {
         await Supabase.initialize(
           url: SupabaseConfig.supabaseUrl,
           anonKey: SupabaseConfig.supabaseAnonKey,
+          // Sesi dipulihkan otomatis dari penyimpanan platform yang didukung
+          // (SharedPreferences di Android, localStorage di Web).
+          debug: false,
         );
-      } catch (e, s) {
-        debugPrint('Supabase init failed: $e $s');
+      } catch (e) {
+        debugPrint('Supabase init gagal: $e');
       }
     } else {
-      debugPrint('[EduTask] Supabase belum dikonfigurasi. Jalankan dengan --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...');
+      debugPrint(
+        '[EduTask] Supabase belum dikonfigurasi. Jalankan dengan '
+        '--dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...',
+      );
     }
 
-    // Notifikasi lokal tetap init walau Supabase demo — biar tidak FC di halaman siswa
-    try {
-      await NotificationService.init();
-    } catch (e, s) {
-      debugPrint('NotificationService init gagal: $e $s');
+    // Notifikasi lokal hanya pada Android/iOS (Web: no-op, lihat NotificationService).
+    if (PlatformCapabilities.supportsLocalNotifications) {
+      try {
+        await NotificationService.init();
+      } catch (e) {
+        debugPrint('NotificationService init gagal: $e');
+      }
     }
 
     runApp(const ProviderScope(child: EduTaskApp()));
   }, (error, stack) {
-    debugPrint('[Uncaught] $error $stack');
+    debugPrint('[Uncaught] $error');
   });
 }

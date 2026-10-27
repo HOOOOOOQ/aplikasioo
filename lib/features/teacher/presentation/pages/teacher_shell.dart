@@ -35,68 +35,74 @@ class TeacherShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final path = GoRouterState.of(context).uri.path;
+    // Sub-halaman berikut sudah membawa AppBar sendiri; AppBar shell
+    // disembunyikan agar tidak muncul dua bilah judul sekaligus.
+    const selfChromeRoutes = {'/guru/riwayat-kode', '/guru/bantuan', '/guru/sesi'};
+    final showShellAppBar = !selfChromeRoutes.contains(path);
     final routes = ['/guru', '/guru/jadwal', '/guru/tugas', '/guru/kode-akses', '/guru/profil'];
     var index = routes.indexOf(path);
     if (index < 0) index = 0;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            const EduTaskLogo(size: 30, withShadow: false),
-            const SizedBox(width: AppSpacing.sm),
-            const Text('EduTask'),
-            const SizedBox(width: AppSpacing.sm),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.primaryContainer,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: const Text(
-                'GURU',
-                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: AppColors.primaryDark, letterSpacing: 0.5),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Pencarian global',
-            onPressed: () => context.go('/guru/pencarian'),
-            icon: const Icon(Icons.search_rounded),
-          ),
-          IconButton(
-            tooltip: 'Chat',
-            onPressed: () => context.go('/guru/chat'),
-            icon: const Icon(Icons.forum_outlined),
-          ),
-          IconButton(
-            tooltip: 'Tentang aplikasi',
-            onPressed: () => context.push('/tentang?from=guru'),
-            icon: const Icon(Icons.info_outline_rounded),
-          ),
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'logout') _logout(context, ref);
-              if (value == 'about') context.push('/tentang?from=guru');
-              if (value == 'pengumuman') context.go('/guru/pengumuman');
-              if (value == 'kalender') context.go('/guru/kalender');
-              if (value == 'notifikasi') context.go('/guru/notifikasi');
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: 'pengumuman', child: Text('Pengumuman')),
-              PopupMenuItem(value: 'kalender', child: Text('Kalender akademik')),
-              PopupMenuItem(value: 'notifikasi', child: Text('Notifikasi')),
-              PopupMenuItem(value: 'about', child: Text('Tentang EduTask')),
-              PopupMenuItem(
-                value: 'logout',
-                child: Text('Keluar', style: TextStyle(color: AppColors.error)),
+      appBar: showShellAppBar
+          ? AppBar(
+          title: Row(
+            children: [
+              const EduTaskLogo(size: 30, withShadow: false),
+              const SizedBox(width: AppSpacing.sm),
+              const Text('EduTask'),
+              const SizedBox(width: AppSpacing.sm),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryContainer,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text(
+                  'GURU',
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: AppColors.primaryDark, letterSpacing: 0.5),
+                ),
               ),
             ],
           ),
-        ],
-      ),
+          actions: [
+            IconButton(
+              tooltip: 'Pencarian global',
+              onPressed: () => context.go('/guru/pencarian'),
+              icon: const Icon(Icons.search_rounded),
+            ),
+            IconButton(
+              tooltip: 'Chat',
+              onPressed: () => context.go('/guru/chat'),
+              icon: const Icon(Icons.forum_outlined),
+            ),
+            IconButton(
+              tooltip: 'Tentang aplikasi',
+              onPressed: () => context.push('/tentang?from=guru'),
+              icon: const Icon(Icons.info_outline_rounded),
+            ),
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'logout') _logout(context, ref);
+                if (value == 'about') context.push('/tentang?from=guru');
+                if (value == 'pengumuman') context.go('/guru/pengumuman');
+                if (value == 'kalender') context.go('/guru/kalender');
+                if (value == 'notifikasi') context.go('/guru/notifikasi');
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(value: 'pengumuman', child: Text('Pengumuman')),
+                PopupMenuItem(value: 'kalender', child: Text('Kalender akademik')),
+                PopupMenuItem(value: 'notifikasi', child: Text('Notifikasi')),
+                PopupMenuItem(value: 'about', child: Text('Tentang EduTask')),
+                PopupMenuItem(
+                  value: 'logout',
+                  child: Text('Keluar', style: TextStyle(color: AppColors.error)),
+                ),
+              ],
+            ),
+          ],
+        )
+          : null,
       body: child,
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,

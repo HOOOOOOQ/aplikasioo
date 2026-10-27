@@ -109,6 +109,8 @@ class _StudentMainPageState extends ConsumerState<StudentMainPage> {
                   context.go('/siswa/identitas');
                 case 'pengaturan':
                   context.go('/siswa/pengaturan');
+                case 'bantuan':
+                  context.go('/siswa/bantuan');
                 case 'login':
                   context.push('/login');
               }
@@ -131,6 +133,16 @@ class _StudentMainPageState extends ConsumerState<StudentMainPage> {
                     Icon(Icons.settings_outlined, size: 18),
                     SizedBox(width: 8),
                     Text('Pengaturan'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'bantuan',
+                child: Row(
+                  children: [
+                    Icon(Icons.help_outline_rounded, size: 18),
+                    SizedBox(width: 8),
+                    Text('Bantuan & FAQ'),
                   ],
                 ),
               ),
@@ -450,6 +462,16 @@ class _StudentMainPageState extends ConsumerState<StudentMainPage> {
                       label: const Text('Chat'),
                     ),
                     OutlinedButton.icon(
+                      onPressed: () => context.go('/siswa/tenggat'),
+                      icon: const Icon(Icons.event_note_outlined, size: 18),
+                      label: const Text('Tenggat'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => context.go('/siswa/guru'),
+                      icon: const Icon(Icons.co_present_outlined, size: 18),
+                      label: const Text('Guru Kelas'),
+                    ),
+                    OutlinedButton.icon(
                       onPressed: () => context.go('/siswa/notifikasi'),
                       icon: const Icon(Icons.notifications_none_rounded, size: 18),
                       label: const Text('Notifikasi'),
@@ -471,6 +493,11 @@ class _StudentMainPageState extends ConsumerState<StudentMainPage> {
                       onPressed: () => context.go('/siswa/pengaturan'),
                       icon: const Icon(Icons.settings_outlined, size: 18),
                       label: const Text('Pengaturan'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => context.go('/siswa/bantuan'),
+                      icon: const Icon(Icons.help_outline_rounded, size: 18),
+                      label: const Text('Bantuan'),
                     ),
                     OutlinedButton.icon(
                       onPressed: () => context.push('/siswa/tentang'),

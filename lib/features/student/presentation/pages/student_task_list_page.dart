@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/app_preferences.dart';
 import '../../../../core/utils/date_utils.dart';
 import '../../../../core/utils/deadline_helper.dart';
 import '../../../../core/widgets/app_card.dart';
@@ -10,6 +11,7 @@ import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/app_states.dart';
 import '../../../../core/widgets/status_chip.dart';
 import '../../../../shared/models/tugas.dart';
+import '../../../notifications/notification_service.dart';
 import '../../identity/student_identity_provider.dart';
 import 'student_main_page.dart';
 
@@ -24,6 +26,10 @@ class _StudentTaskListPageState extends ConsumerState<StudentTaskListPage> {
   final TextEditingController _searchC = TextEditingController();
   String _search = '';
   String _filter = 'semua';
+
+  /// Pengingat tenggat dijadwalkan sekali per kunjungan, setelah daftar tugas
+  /// berhasil dimuat (bukan saat startup) agar tidak meminta izin terlalu dini.
+  bool _remindersSynced = false;
 
   @override
   void dispose() {
@@ -109,6 +115,18 @@ class _StudentTaskListPageState extends ConsumerState<StudentTaskListPage> {
                 ],
               ),
               data: (all) {
+                if (!_remindersSynced) {
+                  _remindersSynced = true;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) return;
+                    final prefs = ref.read(appPreferencesProvider);
+                    NotificationService.scheduleUpcoming(
+                      all,
+                      enabled: prefs.deadlineReminders,
+                    );
+                  });
+                }
+
                 var list = all;
                 if (_filter == 'selesai') {
                   list = list

@@ -294,11 +294,25 @@ class _AccessCodesPageState extends ConsumerState<AccessCodesPage> {
                             '${all.length} kode terbaru.',
                   ),
                 ],
-                const SizedBox(height: AppSpacing.lg),
-                AppSearchField(
-                  controller: _searchC,
-                  hint: 'Cari kode, kelas, atau nama siswa…',
-                  onChanged: (value) => setState(() => _search = value),
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppSearchField(
+                        controller: _searchC,
+                        hint: 'Cari kode, kelas, atau nama siswa…',
+                        onChanged: (value) => setState(() => _search = value),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    IconButton.filledTonal(
+                      tooltip: 'Riwayat & pemakaian kode',
+                      onPressed: () => context.push(
+                        widget.isTeacher ? '/guru/riwayat-kode' : '/admin/riwayat-kode',
+                      ),
+                      icon: const Icon(Icons.history_rounded, size: 20),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 SingleChildScrollView(

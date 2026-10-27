@@ -44,7 +44,7 @@ class TeacherProfilePage extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        AppPreferencesSection(aboutRoute: '/guru/tentang'),
+        AppPreferencesSection(aboutRoute: '/guru/tentang', helpRoute: '/guru/bantuan'),
         const SizedBox(height: AppSpacing.xl),
         const SectionHeader(title: 'Bantuan', icon: Icons.help_outline_rounded),
         AppCard(

@@ -87,7 +87,7 @@ class StudentSettingsPage extends ConsumerWidget {
                   ),
           ),
           const SizedBox(height: AppSpacing.xl),
-          AppPreferencesSection(aboutRoute: '/siswa/tentang'),
+          AppPreferencesSection(aboutRoute: '/siswa/tentang', helpRoute: '/siswa/bantuan'),
           const SizedBox(height: AppSpacing.xl),
           Center(
             child: Column(

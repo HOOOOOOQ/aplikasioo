@@ -91,7 +91,7 @@ class AdminSettingsPage extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.xl),
-        AppPreferencesSection(aboutRoute: '/admin/tentang'),
+        AppPreferencesSection(aboutRoute: '/admin/tentang', helpRoute: '/admin/bantuan'),
         const SizedBox(height: AppSpacing.xl),
         const SectionHeader(title: 'Bantuan & panduan', icon: Icons.menu_book_rounded),
         AppCard(

@@ -43,10 +43,11 @@ class WelcomeSoundService {
             usageType: AndroidUsageType.notificationEvent,
             audioFocus: AndroidAudioFocus.none,
           ),
-          iOS: AudioContextIOS(
-            category: AVAudioSessionCategory.ambient,
-            options: const {AVAudioSessionOptions.mixWithOthers},
-          ),
+          // `ambient` sudah otomatis bercampur dengan audio lain; opsi
+          // `mixWithOthers` eksplisit hanya diizinkan audioplayers untuk
+          // kategori playback/playAndRecord/multiRoute sehingga tidak dipakai
+          // di sini agar tidak memicu assert pada iOS.
+          iOS: AudioContextIOS(category: AVAudioSessionCategory.ambient),
         ),
       );
       await player.setReleaseMode(ReleaseMode.stop);

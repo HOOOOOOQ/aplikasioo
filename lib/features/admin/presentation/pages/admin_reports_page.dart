@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/csv_builder.dart';
+import '../../../../core/widgets/csv_export_sheet.dart';
 import '../../../../core/utils/date_utils.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_header.dart';
@@ -28,6 +30,52 @@ class AdminReportsPage extends ConsumerStatefulWidget {
 
 class _AdminReportsPageState extends ConsumerState<AdminReportsPage> {
   String? _kelasFilter;
+
+  /// Nama kelas terpilih untuk judul berkas & ringkasan ekspor.
+  String _kelasLabel(List<Kelas> kelasList) {
+    final id = _kelasFilter;
+    if (id == null) return 'Semua kelas';
+    for (final kelas in kelasList) {
+      if (kelas.id == id) return kelas.namaKelas;
+    }
+    return 'Kelas terpilih';
+  }
+
+  void _exportCsv(BuildContext context, List<TugasReportRow> rows, List<Kelas> kelasList) {
+    final header = <Object?>[
+      'Judul Tugas',
+      'Kelas',
+      'Mata Pelajaran',
+      'Tenggat',
+      'Total Siswa',
+      'Selesai',
+      'Belum',
+      'Terlambat',
+      'Persentase Selesai',
+    ];
+    final body = rows
+        .map((row) => <Object?>[
+              row.tugas.judul,
+              row.tugas.kelasNama ?? '-',
+              row.tugas.mataPelajaranNama ?? '-',
+              AppDateUtils.formatTanggal(row.tugas.tenggatWaktu),
+              row.totalSiswa,
+              row.selesai,
+              row.belum,
+              row.terlambat,
+              '${row.persen.toStringAsFixed(1)}%',
+            ])
+        .toList();
+    final csv = CsvBuilder.build([header, ...body]);
+
+    showCsvExportSheet(
+      context,
+      fileName: CsvBuilder.fileName('laporan-tugas-${_kelasLabel(kelasList)}', DateTime.now()),
+      csv: csv,
+      summary: '${rows.length} tugas • ${_kelasLabel(kelasList)} • '
+          'data dari server (status resmi siswa dengan kode akses).',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +130,7 @@ class _AdminReportsPageState extends ConsumerState<AdminReportsPage> {
               onRetry: () => ref.invalidate(reportProvider(_kelasFilter)),
             ),
             data: (rows) {
+              final kelasList = kelasAsync.valueOrNull ?? const <Kelas>[];
               if (rows.isEmpty) {
                 return const AppCard(
                   child: AppEmptyState(
@@ -100,6 +149,26 @@ class _AdminReportsPageState extends ConsumerState<AdminReportsPage> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _kelasLabel(kelasList),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => _exportCsv(context, rows, kelasList),
+                        icon: const Icon(Icons.download_rounded, size: 17),
+                        label: const Text('Ekspor CSV'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
                   GridView.count(
                     crossAxisCount: 2,
                     shrinkWrap: true,
