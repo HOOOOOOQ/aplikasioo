@@ -12,6 +12,9 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  # Dibutuhkan hanya pada target Web (URL strategy). Paket bawaan SDK Flutter.
+  flutter_web_plugins:
+    sdk: flutter
   cupertino_icons: ^1.0.6
   flutter_riverpod: ^2.5.1
   riverpod_annotation: ^2.3.4

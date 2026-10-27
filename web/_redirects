@@ -1,0 +1,7 @@
+# Netlify / Cloudflare Pages: semua rute diarahkan ke index.html agar refresh
+# browser pada /#/admin, /#/siswa, dan /#/tentang tidak menghasilkan 404.
+#
+# Default EduTask di Web memakai hash strategy (/#/admin) sehingga file ini
+# tidak wajib. File ini disiapkan untuk kondisi path strategy:
+#   flutter build web --dart-define=USE_PATH_URL_STRATEGY=true
+/*    /index.html   200
