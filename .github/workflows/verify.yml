@@ -122,6 +122,7 @@ jobs:
       - name: Verifikasi artefak web
         run: |
           set -e
+          exec > >(tee web-verify.log) 2>&1
           test -f build/web/index.html
           test -f build/web/manifest.json
           test -f build/web/flutter_bootstrap.js
@@ -151,6 +152,14 @@ jobs:
             if [ -f web-build.log ]; then tail -c 8000 web-build.log; else echo 'log tidak tersedia'; fi
             echo '```'
           } > web-comment.md
+          {
+            echo
+            echo '**Pemeriksaan artefak:**'
+            echo
+            echo '```'
+            if [ -f web-verify.log ]; then cat web-verify.log; else echo 'log verifikasi tidak tersedia'; fi
+            echo '```'
+          } >> web-comment.md
           gh pr comment "$PR" --body-file web-comment.md --edit-last \
             || gh pr comment "$PR" --body-file web-comment.md
 
