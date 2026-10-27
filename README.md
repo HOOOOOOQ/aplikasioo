@@ -12,7 +12,8 @@ tugas, lampiran, kode akses siswa, dan laporan penyelesaian tugas.
 > pin → position → tenggat → id). Hasil CI: `flutter analyze` 0 error,
 > **210 tes lulus**, `build web` + `build apk` hijau (build #96).
 > **Migration `007` belum dijalankan** di database mana pun.
-> APK uji (pratinjau dari branch PR, belum digabung ke `main`):
+> APK: <https://github.com/HOOOOOOQ/aplikasioo/releases/tag/latest-apk>
+> (dipublikasikan otomatis saat push ke `main`). Pratinjau dari branch PR:
 > <https://github.com/HOOOOOOQ/aplikasioo/releases/tag/preview-apk>.
 > SQL lengkap, langkah manual, hasil CI, dan batasan yang belum diuji:
 > [`docs/round6-edutask.md`](docs/round6-edutask.md).
