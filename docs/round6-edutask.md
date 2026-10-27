@@ -579,11 +579,12 @@ tidak tersentuh.
 | Emulator x86_64 | `EduTask-1.2.0-x86_64.apk` — 28 MB | <https://github.com/HOOOOOOQ/aplikasioo/releases/download/preview-apk/EduTask-1.2.0-x86_64.apk> |
 | Checksum | `SHA256SUMS.txt` | <https://github.com/HOOOOOOQ/aplikasioo/releases/download/preview-apk/SHA256SUMS.txt> |
 
-Isi build #100 (commit `1530157`, sama kode dengan `ecc2af2`):
-`com.edutask.sekolah`, versionCode 100, versionName 1.2.0, minSdk 24,
-targetSdk 36, signature v2 + v3 memakai keystore uji (`f3d985e4…ffcbf9`).
-Berkas pratinjau **ditimpa setiap build baru** di branch ini; tautan di atas
-tetap sama karena memakai tag `preview-apk`.
+Isi pratinjau (kode yang sama dengan commit `ecc2af2` — commit setelahnya hanya
+dokumentasi/CI): `com.edutask.sekolah`, versionName 1.2.0, minSdk 24,
+targetSdk 36, signature v2 + v3 dengan keystore uji (`f3d985e4…ffcbf9`).
+Berkas pratinjau **ditimpa setiap build baru** di branch ini (nomor build
+tercetak di judul release dan di `versionCode` APK); tautan di atas tetap sama
+karena memakai tag `preview-apk`.
 
 > Pratinjau ini **belum lolos uji instalasi otomatis** (langkah `install-test`
 > di CI masih gagal karena emulator, lihat tabel §9) dan **migration 007 belum
