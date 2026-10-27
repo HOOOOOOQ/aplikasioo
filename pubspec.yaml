@@ -50,6 +50,14 @@ dependencies:
   printing: ^5.14.3
   # Unduhan PDF di Web memakai Blob + anchor (tanpa CDN pihak ketiga).
   web: ^1.0.0
+  # Kompatibilitas `pdf` <-> `image` <-> `archive`:
+  # `pdf 3.11.3` membatasi `archive >=3.4.0 <4.1.0`, sementara `image 4.11+`
+  # memanggil `ZLibDecoder.decodeLazy` yang baru ada di `archive >=4.1.0`.
+  # Hasilnya: "The method 'decodeLazy' isn't defined for the type
+  # 'ZLibDecoder'" saat kompilasi (dart2js maupun kernel test).
+  # `image 4.10.x` masih memakai `decodeBytes`, jadi aman dengan archive 4.0.9.
+  # Hapus pin ini setelah `pdf` mengizinkan `archive >=4.1.0`.
+  image: '>=4.10.0 <4.11.0'
 
 dev_dependencies:
   flutter_test:
