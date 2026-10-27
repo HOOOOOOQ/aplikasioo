@@ -466,7 +466,8 @@ indikator "Menyiapkan…" selama proses.
 ## 9. Hasil verifikasi
 
 Diuji lewat GitHub Actions pada branch `arena/860055b9-aplikasioo`, commit
-**`ecc2af2`** (PR #66) — commit terakhir yang mengubah kode. Tidak ada
+**`ecc2af2`** (PR #66) — commit terakhir yang mengubah kode. PR #66 **sudah
+digabung ke `main`** sebagai merge commit `56f0cb2` (2026-10-27, lihat §9.4). Tidak ada
 pemeriksaan di bawah ini yang dijalankan di laptop pengembang; semuanya berasal
 dari CI.
 
@@ -479,7 +480,7 @@ dari CI.
 | `flutter test` | **TERVERIFIKASI CI** | **210 tes lulus** (sebelumnya 162; +48 tes baru ronde ini: 42 fitur, 3 pemetaan error, 3 konsistensi CSV ↔ PDF + label periode). |
 | `flutter build web --release` | **TERVERIFIKASI CI** | Sukses (job `web-build` hijau). Pemeriksaan artefak lolos: `index.html`, `manifest.json`, `flutter_bootstrap.js`, `main.dart.js`, `flutter_service_worker.js`, ikon 192 px ada; teks `EduTask` ada di `index.html`; **tidak ada** string `service_role` di bundle. Ukuran pasti tidak ditampilkan di komentar PR (ada di log job). |
 | `flutter build apk --release` | **TERVERIFIKASI CI** | **APK build #96** sukses: universal 67 MB (versionCode 96), arm64-v8a 27 MB (2096), armeabi-v7a 25 MB (1096), x86_64 28 MB (4096); `applicationId com.edutask.sekolah`, `minSdk 24`, `targetSdk 36`, ditandatangani kunci uji yang sama (`f3d985e4…ffcbf9`). |
-| `install-test` (emulator x86_64) | **GAGAL — INFRASTRUKTUR CI** | Terjadi pada setiap percobaan (#91, #93, #96, #98): emulator tidak menghasilkan log smoke test (`emulator gagal boot / action gagal sebelum skrip`). Langkah ini memakai `continue-on-error`, jadi job tetap hijau, tetapi **instalasi APK belum terbukti** lewat CI. |
+| `install-test` (emulator x86_64) | **GAGAL — INFRASTRUKTUR CI** | Terjadi pada setiap percobaan (#91, #93, #96, #98, #103): emulator tidak menghasilkan log smoke test (`emulator gagal boot / action gagal sebelum skrip`). Langkah ini memakai `continue-on-error`, jadi job tetap hijau, tetapi **instalasi APK belum terbukti** lewat CI. |
 | Uji pin/PDF manual di perangkat nyata | **BELUM TERVERIFIKASI** | Butuh perangkat + database live. |
 | Uji di browser nyata | **BELUM TERVERIFIKASI** | Butuh browser + Supabase live. |
 | Migration di database produksi | **BELUM DIJALANKAN** | Jalankan manual (bagian 3.1). |
@@ -497,7 +498,7 @@ Detail APK build #96 (`SHA256SUMS.txt` lengkap ada di komentar PR):
 > Actions). Release `latest-apk` belum diperbarui karena workflow APK hanya
 > memublikasikan release saat push ke `main` — yaitu setelah PR ini digabung.
 
-Catatan penting soal `install-test`: pada build #91, #93, #96, dan #98 langkah emulator **gagal**
+Catatan penting soal `install-test`: pada build #91, #93, #96, #98, dan #103 langkah emulator **gagal**
 (emulator tidak boot / action gagal sebelum skrip dijalankan) sehingga tidak ada
 bukti instalasi dari CI. Karena langkah itu `continue-on-error: true`, status
 job tetap hijau — angka "hijau" di atas **tidak** boleh dibaca sebagai bukti
@@ -560,16 +561,41 @@ sementara kegagalan *ekspektasi* ditulis sebagai baris `Expected: contains …`.
 * **Bukti:** commit `ecc2af2` → `analyze-test` hijau (**210 tes lulus**),
   `build` hijau (**build #96**), `web-build` hijau.
 
-### 9.4 Unduh APK pratinjau (untuk uji di perangkat)
+### 9.4 Unduh APK
+
+**Status: PR #66 sudah digabung ke `main`** (merge commit `56f0cb2`,
+2026-10-27). Build otomatis dari `main` menghasilkan **run #103** dan
+memperbarui release `latest-apk`, jadi tautan resmi sekarang:
+
+<https://github.com/HOOOOOOQ/aplikasioo/releases/tag/latest-apk>
+
+| Perangkat | Berkas | Unduh |
+|---|---|---|
+| HP Android modern (disarankan) | `EduTask-1.2.0-arm64-v8a.apk` — 27 MB | <https://github.com/HOOOOOOQ/aplikasioo/releases/download/latest-apk/EduTask-1.2.0-arm64-v8a.apk> |
+| HP Android 32-bit lama | `EduTask-1.2.0-armeabi-v7a.apk` — 25 MB | <https://github.com/HOOOOOOQ/aplikasioo/releases/download/latest-apk/EduTask-1.2.0-armeabi-v7a.apk> |
+| Semua ABI dalam satu berkas | `EduTask-1.2.0-universal.apk` — 67 MB | <https://github.com/HOOOOOOQ/aplikasioo/releases/download/latest-apk/EduTask-1.2.0-universal.apk> |
+| Emulator x86_64 | `EduTask-1.2.0-x86_64.apk` — 28 MB | <https://github.com/HOOOOOOQ/aplikasioo/releases/download/latest-apk/EduTask-1.2.0-x86_64.apk> |
+| Checksum | `SHA256SUMS.txt` | <https://github.com/HOOOOOOQ/aplikasioo/releases/download/latest-apk/SHA256SUMS.txt> |
+
+SHA-256 build #103 (`latest-apk`):
+
+```
+6c64f76c175e4e0f53fb32f0c73ce33a0a542b67f4f57df9170bf19c1a3eedfe  EduTask-1.2.0-arm64-v8a.apk
+19647d9a28a04eb1d8499f640bbbf1e627efdac314e2b230be8c5504a3da4b3d  EduTask-1.2.0-armeabi-v7a.apk
+f64cee64ebb425b1ca0b8b8fd0db4f7acf63fca2e3703c3a6d33e8dd9cfb466a  EduTask-1.2.0-universal.apk
+d4427208a235f1313f883613f2e27c06f4e28048ae299170a794e73107fd40ee  EduTask-1.2.0-x86_64.apk
+```
+
+#### Release pratinjau (branch PR, sebelum digabung)
 
 Artifact GitHub Actions memerlukan login dan berbentuk `.zip`, sedangkan
 release `latest-apk` hanya diperbarui saat push ke `main`. Karena itu job
-`build` sekarang juga memublikasikan **pre-release** `preview-apk` dari branch
-PR (langkah `Publikasikan APK pratinjau (bukan main)`), sehingga APK bisa
-diunduh langsung sebagai berkas `.apk` tanpa login. Release `latest-apk`
-tidak tersentuh.
+`build` juga memublikasikan **pre-release** `preview-apk` dari setiap branch PR
+(langkah `Publikasikan APK pratinjau (bukan main)`), sehingga APK branch bisa
+diunduh sebagai berkas `.apk` tanpa login dan tanpa menunggu merge.
+Release `latest-apk` tidak tersentuh oleh jalur ini.
 
-**Halaman release:** <https://github.com/HOOOOOOQ/aplikasioo/releases/tag/preview-apk>
+**Halaman release pratinjau:** <https://github.com/HOOOOOOQ/aplikasioo/releases/tag/preview-apk>
 
 | Perangkat | Berkas | Unduh |
 |---|---|---|
@@ -586,10 +612,18 @@ Berkas pratinjau **ditimpa setiap build baru** di branch ini (nomor build
 tercetak di judul release dan di `versionCode` APK); tautan di atas tetap sama
 karena memakai tag `preview-apk`.
 
-> Pratinjau ini **belum lolos uji instalasi otomatis** (langkah `install-test`
-> di CI masih gagal karena emulator, lihat tabel §9) dan **migration 007 belum
+> **Belum ada uji instalasi otomatis yang berhasil** (langkah `install-test`
+> masih gagal karena emulator, lihat tabel §9) dan **migration 007 belum
 > dijalankan**. Setelah memasang APK: ekspor PDF bisa langsung dicoba, tetapi
 > tombol semat akan menampilkan pesan error sampai SQL §3 dijalankan.
+
+Catatan `install-test` pada build #103: job tampak hijau, tetapi langkah smoke
+test memakai `continue-on-error: true` sehingga GitHub selalu melaporkan
+`conclusion: success` untuk langkah itu (yang tersimpan hanyalah `outcome`).
+Artefak `emulator-smoke-log` berukuran 281 byte — sama seperti run yang gagal
+(#98: 279 byte) dan jauh lebih kecil dari log smoke test yang sebenarnya
+(berisi `dumpsys`, `am start`, logcat) — jadi emulator **masih gagal boot**.
+Instalasi APK tetap **belum terbukti** lewat CI.
 
 ---
 
