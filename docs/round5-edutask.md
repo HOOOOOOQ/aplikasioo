@@ -354,6 +354,20 @@ dibaca dari kode). Job tersebut:
 5. mengunggah `build/web` sebagai artifact (retensi 7 hari) dan menulis
    ringkasan ke komentar PR.
 
+Hasil nyata pada PR ini (Flutter 3.35.4):
+
+```
+Compiling lib/main.dart for the Web...
+✓ Built build/web
+Ukuran build/web: 35M
+Jumlah berkas: 41
+index.html · manifest.json · flutter_bootstrap.js · main.dart.js ·
+flutter_service_worker.js · flutter.js · favicon.png · 404.html · _redirects
+```
+
+Pemeriksaan `service_role` di bundle: **tidak ditemukan**. Artifact
+`edutask-web-<run>` tersedia pada halaman run Actions (retensi 7 hari).
+
 Perintah lokal yang setara:
 
 ```bash
@@ -364,8 +378,8 @@ flutter build web --release \
 ```
 
 Profil basis data sesi di Web memakai `localStorage` (dikelola `supabase_flutter`),
-sehingga refresh halaman tidak menghapus sesi. **Status: TERVERIFIKASI CI bila
-job `web-build` pada PR berwarna hijau** (lihat komentar `### Hasil flutter build web`).
+sehingga refresh halaman tidak menghapus sesi. **Status: TERVERIFIKASI CI**
+(job `web-build` hijau; `flutter build web --release` berhasil).
 
 ## 12. Langkah lokal (`localhost:8080`)
 
