@@ -98,6 +98,48 @@ String _homeFor(AppUser? user) {
   return user.role == UserRole.admin ? '/admin' : '/guru';
 }
 
+/// Kebijakan redirect router, dipisah sebagai fungsi murni.
+///
+/// Dipisah supaya bisa diuji tanpa membangun GoRouter atau Supabase — termasuk
+/// skenario yang paling sering menjadi bug: **refresh URL di Web** (mis.
+/// membuka `/admin/tugas` langsung di tab baru) dan percobaan membuka rute
+/// milik peran lain.
+///
+/// Aturan:
+///  * `/splash`, `/onboarding`, `/login`, `/tentang` selalu boleh.
+///  * Semua `/siswa/**` boleh tanpa login (siswa memakai kode akses).
+///  * Selain itu (termasuk `/bantuan`) dianggap publik.
+///  * `/admin/**` dan `/guru/**` wajib login + akun aktif + peran yang cocok.
+///  * Selama profil masih dimuat (`isLoading`, user belum ada) → `/splash`,
+///    bukan `/login`, agar pengguna tidak terlempar ke login saat refresh.
+String? resolveRedirect({
+  required String path,
+  required AsyncValue<AppUser?> auth,
+}) {
+  final user = auth.valueOrNull;
+
+  if (path == '/splash' || path == '/onboarding') return null;
+  if (path == '/login' || path == '/tentang') return null;
+  if (path.startsWith('/siswa')) return null;
+
+  final isProtected = path.startsWith('/admin') || path.startsWith('/guru');
+  if (!isProtected) return null;
+
+  if (auth.isLoading && user == null) return '/splash';
+  if (user == null) return '/login';
+  if (!user.isActive) return '/login';
+
+  if (path.startsWith('/admin') && user.role != UserRole.admin) {
+    return user.role == UserRole.guru ? '/guru' : '/login';
+  }
+  if (path.startsWith('/guru') &&
+      user.role != UserRole.guru &&
+      user.role != UserRole.admin) {
+    return '/login';
+  }
+  return null;
+}
+
 final appRouterProvider = Provider<GoRouter>((ref) {
   final refresh = _RouterRefresh();
   ref.onDispose(refresh.dispose);
@@ -109,34 +151,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
     initialLocation: '/splash',
     refreshListenable: refresh,
-    redirect: (context, state) {
-      final path = state.uri.path;
-      final auth = ref.read(currentUserProvider);
-      final user = auth.valueOrNull;
-
-      // Rute publik.
-      if (path == '/splash' || path == '/onboarding') return null;
-      if (path == '/login' || path == '/tentang') return null;
-      if (path.startsWith('/siswa')) return null;
-
-      // Jangan pernah menampilkan dashboard sebelum profil & role terverifikasi.
-      final isProtected = path.startsWith('/admin') || path.startsWith('/guru');
-      if (!isProtected) return null;
-
-      if (auth.isLoading && user == null) return '/splash';
-      if (user == null) return '/login';
-      if (!user.isActive) return '/login';
-
-      if (path.startsWith('/admin') && user.role != UserRole.admin) {
-        return user.role == UserRole.guru ? '/guru' : '/login';
-      }
-      if (path.startsWith('/guru') &&
-          user.role != UserRole.guru &&
-          user.role != UserRole.admin) {
-        return '/login';
-      }
-      return null;
-    },
+    // Kebijakan redirect ada di [resolveRedirect] agar bisa diuji terpisah.
+    redirect: (context, state) => resolveRedirect(
+      path: state.uri.path,
+      auth: ref.read(currentUserProvider),
+    ),
     routes: [
       GoRoute(path: '/splash', builder: (ctx, s) => const SplashPage()),
       GoRoute(path: '/', redirect: (c, s) => '/splash'),

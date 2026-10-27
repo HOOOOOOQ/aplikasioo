@@ -83,14 +83,18 @@ void main() {
     testWidgets('pita offline tidak menangkap sentuhan', (tester) async {
       await tester.pumpWidget(const _BannerHarness(NetworkStatus.offline));
       await tester.pump();
-      // IgnorePointer membungkus seluruh pita: ketukan diteruskan ke bawah.
-      expect(
-        find.ancestor(
-          of: find.textContaining('Tidak ada koneksi'),
-          matching: find.byType(IgnorePointer),
-        ),
-        findsOneWidget,
+      // IgnorePointer milik banner harus aktif (ignoring: true) supaya ketukan
+      // diteruskan ke AppBar/tombol di bawahnya. Cari yang paling dekat dengan
+      // teks agar tidak tertukar dengan IgnorePointer internal Flutter.
+      final pointer = tester.widget<IgnorePointer>(
+        find
+            .ancestor(
+              of: find.textContaining('Tidak ada koneksi'),
+              matching: find.byType(IgnorePointer),
+            )
+            .first,
       );
+      expect(pointer.ignoring, isTrue);
     });
   });
 }
