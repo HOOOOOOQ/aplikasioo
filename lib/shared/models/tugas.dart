@@ -14,6 +14,14 @@ class Tugas extends Equatable {
   final DateTime tenggatWaktu;
   final String? lampiranPath;
   final String statusPublikasi; // draft, published, archived
+
+  /// Disematkan (pin) oleh admin/guru agar tampil paling atas. Default `false`
+  /// supaya data lama (sebelum migration 007) tetap terbaca tanpa perubahan.
+  final bool isPinned;
+
+  /// Urutan manual di antara tugas yang di-pin (kecil = lebih atas).
+  final int position;
+
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -35,11 +43,28 @@ class Tugas extends Equatable {
     required this.tenggatWaktu,
     this.lampiranPath,
     this.statusPublikasi = 'published',
+    this.isPinned = false,
+    this.position = 0,
     required this.createdAt,
     required this.updatedAt,
     this.statusSiswa,
     this.selesaiPada,
   });
+
+  /// Pembacaan boolean yang aman untuk data lama / tipe lain (text/bigint).
+  static bool _parseBool(dynamic v) {
+    if (v is bool) return v;
+    if (v is num) return v != 0;
+    final text = v?.toString().toLowerCase().trim();
+    return text == 'true' || text == '1' || text == 't' || text == 'yes';
+  }
+
+  /// Pembacaan integer yang aman; nilai tidak valid menjadi [fallback].
+  static int _parseInt(dynamic v, {int fallback = 0}) {
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v?.toString() ?? '') ?? fallback;
+  }
 
   static DateTime _parseDt(dynamic v, {DateTime? fallback}) {
     if (v == null) return fallback ?? DateTime.now();
@@ -88,6 +113,8 @@ class Tugas extends Equatable {
       tenggatWaktu: _parseDt(json['tenggat_waktu']),
       lampiranPath: json['lampiran_path'] as String?,
       statusPublikasi: json['status_publikasi'] as String? ?? 'published',
+      isPinned: _parseBool(json['is_pinned']),
+      position: _parseInt(json['position']),
       createdAt: _parseDt(json['created_at']),
       updatedAt: _parseDt(json['updated_at']),
       statusSiswa: statusSiswa,
@@ -125,6 +152,8 @@ class Tugas extends Equatable {
     String? statusPublikasi,
     String? statusSiswa,
     DateTime? selesaiPada,
+    bool? isPinned,
+    int? position,
   }) {
     return Tugas(
       id: id,
@@ -140,6 +169,8 @@ class Tugas extends Equatable {
       tenggatWaktu: tenggatWaktu ?? this.tenggatWaktu,
       lampiranPath: lampiranPath ?? this.lampiranPath,
       statusPublikasi: statusPublikasi ?? this.statusPublikasi,
+      isPinned: isPinned ?? this.isPinned,
+      position: position ?? this.position,
       createdAt: createdAt,
       updatedAt: updatedAt,
       statusSiswa: statusSiswa ?? this.statusSiswa,
@@ -148,5 +179,5 @@ class Tugas extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, judul, tenggatWaktu, statusSiswa];
+  List<Object?> get props => [id, judul, tenggatWaktu, statusSiswa, isPinned, position];
 }

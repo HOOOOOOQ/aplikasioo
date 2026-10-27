@@ -41,6 +41,16 @@ class AppDateUtils {
     return DateFormat(pattern, 'id_ID').format(jkt);
   }
 
+  /// Format tanggal **kalender** tanpa konversi zona waktu.
+  ///
+  /// Dipakai untuk nilai yang sejak awal berupa tanggal pilihan pengguna
+  /// (mis. periode filter laporan), bukan timestamp dari server. Tanpa ini,
+  /// tanggal 1 Januari bisa tampil 31 Desember pada perangkat di zona waktu
+  /// yang jauh dari Asia/Jakarta.
+  static String formatTanggalKalender(DateTime dt, {String pattern = 'dd MMMM yyyy'}) {
+    return DateFormat(pattern, 'id_ID').format(dt);
+  }
+
   static String formatTanggalJam(DateTime? dt) {
     if (dt == null) return '-';
     final jkt = toJakarta(dt);

@@ -285,6 +285,9 @@ class _TugasCard extends StatelessWidget {
                 label: AppDateUtils.formatTanggal(tugas.tenggatWaktu),
                 icon: Icons.event_outlined,
               ),
+              // Penanda baca-saja: siswa tidak pernah mendapat aksi pin/urutan.
+              if (tugas.isPinned)
+                const MetaPill(label: 'Disematkan', icon: Icons.push_pin_rounded),
               if (official)
                 const StatusSourceBadge(official: true)
               else if (local)

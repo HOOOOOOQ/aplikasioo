@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/status_tugas.dart';
 import '../models/tugas.dart';
+import '../models/tugas_sort.dart';
 import '../services/supabase_service.dart';
 
 /// Ringkasan penyelesaian satu tugas untuk laporan.
@@ -36,6 +37,8 @@ class TugasRepository {
     String? siswaId,
     String statusPublikasi = 'published',
     int? limit,
+    DateTime? tenggatFrom,
+    DateTime? tenggatTo,
   }) async {
     final c = _c;
     if (c == null) return const [];
@@ -45,8 +48,20 @@ class TugasRepository {
     if (guruId != null && guruId.isNotEmpty) query = query.eq('guru_id', guruId);
     if (mapelId != null && mapelId.isNotEmpty) query = query.eq('mata_pelajaran_id', mapelId);
     if (statusPublikasi.isNotEmpty) query = query.eq('status_publikasi', statusPublikasi);
+    // Rentang tanggal memakai tenggat tugas: batas atas memakai 23:59:59.999
+    // dari tanggal yang dipilih agar tugas pada hari itu tetap ikut.
+    if (tenggatFrom != null) {
+      query = query.gte('tenggat_waktu', tenggatFrom.toUtc().toIso8601String());
+    }
+    if (tenggatTo != null) {
+      final endOfDay = DateTime(tenggatTo.year, tenggatTo.month, tenggatTo.day, 23, 59, 59, 999);
+      query = query.lte('tenggat_waktu', endOfDay.toUtc().toIso8601String());
+    }
 
-    var rows = await query.order('tenggat_waktu', ascending: true);
+    var ordered = query.order('tenggat_waktu', ascending: true);
+    // Batas diambil dari server agar laporan besar tidak menarik seluruh tabel.
+    if (limit != null) ordered = ordered.limit(limit);
+    var rows = await ordered;
     if (limit != null && rows.length > limit) rows = rows.sublist(0, limit);
 
     var list = rows.map((e) => Tugas.fromJson(Map<String, dynamic>.from(e))).toList();
@@ -86,7 +101,9 @@ class TugasRepository {
           .toList();
     }
 
-    return list;
+    // Urutan deterministik: tugas yang di-pin di atas, sisanya tetap urut
+    // tenggat seperti sebelumnya (lihat [TugasSorting]).
+    return TugasSorting.sortForDisplay(list);
   }
 
   Future<Tugas?> fetchById(String id, {String? siswaId}) async {
@@ -139,6 +156,39 @@ class TugasRepository {
     await c.from('tugas').delete().eq('id', id);
   }
 
+  /// Menyematkan (pin) atau melepas pin tugas.
+  ///
+  /// Memanggil RPC `set_tugas_pin` (migration 007). Otorisasi diperiksa di
+  /// server: RLS `tugas` hanya mengizinkan admin dan guru pemilik baris, lalu
+  /// fungsi memeriksa ulang peran + kepemilikan sebelum menulis. Klien tidak
+  /// pernah mengirim `guru_id` atau peran; server memakai `auth.uid()`.
+  ///
+  /// [position] `null` berarti server menentukan posisi berikutnya secara
+  /// atomik (di dalam transaksi RPC), sehingga dua pengguna yang menekan pin
+  /// bersamaan tidak menghasilkan posisi yang sama persis.
+  ///
+  /// Melempar `PostgrestException` (kode 42501 untuk akses ditolak) yang
+  /// diterjemahkan [AppError] di lapisan UI.
+  Future<Tugas?> setPin({
+    required String tugasId,
+    required bool pinned,
+    int? position,
+  }) async {
+    final c = SupabaseService.tryClient;
+    if (c == null) {
+      throw Exception('Supabase belum dikonfigurasi — atur SUPABASE_URL/ANON_KEY');
+    }
+    final data = await c.rpc('set_tugas_pin', params: {
+      'p_tugas_id': tugasId,
+      'p_pinned': pinned,
+      'p_position': position,
+    });
+    if (data is Map) {
+      return Tugas.fromJson(Map<String, dynamic>.from(data));
+    }
+    return null;
+  }
+
   Future<List<StatusTugasSiswa>> fetchStatusForTugas(String tugasId) async {
     final c = _c;
     if (c == null) return const [];
@@ -180,11 +230,25 @@ class TugasRepository {
 
   /// Laporan agregat untuk admin/guru. Mengambil tugas lalu semua status
   /// sekaligus (dua query, bukan N+1).
-  Future<List<TugasReportRow>> fetchReport({String? kelasId, String? guruId}) async {
+  Future<List<TugasReportRow>> fetchReport({
+    String? kelasId,
+    String? guruId,
+    String? mapelId,
+    DateTime? from,
+    DateTime? to,
+    int? limit,
+  }) async {
     final c = _c;
     if (c == null) return const [];
 
-    final tugasList = await fetchAll(kelasId: kelasId, guruId: guruId);
+    final tugasList = await fetchAll(
+      kelasId: kelasId,
+      guruId: guruId,
+      mapelId: mapelId,
+      tenggatFrom: from,
+      tenggatTo: to,
+      limit: limit,
+    );
     if (tugasList.isEmpty) return const [];
 
     final tugasIds = tugasList.map((t) => t.id).toList();

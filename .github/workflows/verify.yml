@@ -63,13 +63,34 @@ jobs:
             head -c 55000 analyze.log
             echo '```'
           } > comment.md
-          gh pr comment "$PR" --body-file comment.md --edit-last \
-            || gh pr comment "$PR" --body-file comment.md
+          gh pr comment "$PR" --body-file comment.md
 
       - name: Unit & widget tests
         run: |
           set -o pipefail
           flutter test 2>&1 | tee test.log
+
+      # Ringkasan kegagalan masuk ke job summary supaya nama tes yang gagal
+      # terbaca tanpa mengunduh log mentah (log mentah tidak selalu bisa
+      # diakses dari luar).
+      - name: Ringkasan kegagalan test
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ ! -f test.log ]; then exit 0; fi
+          {
+            echo '### Tes yang gagal (ringkas)'
+            echo
+            echo '```'
+            grep -nE "\[E\]|Expected:|Actual:|Which:|TimeoutException|Failed to load|Some tests failed" -A 25 test.log | head -300 || true
+            echo '```'
+          } > test-fail.md
+          cat test-fail.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$PR" ]; then
+            gh pr comment "$PR" --body-file test-fail.md || true
+          fi
 
       - name: Publikasikan hasil test ke PR
         if: always() && github.event_name == 'pull_request'
@@ -139,6 +160,25 @@ jobs:
           echo "Jumlah berkas:" && find build/web -type f | wc -l
           find build/web -maxdepth 1 -type f -printf '%f\n' | sort
 
+      - name: Ringkasan kegagalan build web
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ ! -f web-build.log ]; then exit 0; fi
+          {
+            echo '### Kegagalan `flutter build web`'
+            echo
+            echo '```'
+            tail -c 12000 web-build.log
+            echo '```'
+          } > web-fail.md
+          cat web-fail.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$PR" ]; then
+            gh pr comment "$PR" --body-file web-fail.md || true
+          fi
+
       - name: Publikasikan hasil build web ke PR
         if: always() && github.event_name == 'pull_request'
         env:
@@ -160,8 +200,7 @@ jobs:
             if [ -f web-verify.log ]; then cat web-verify.log; else echo 'log verifikasi tidak tersedia'; fi
             echo '```'
           } >> web-comment.md
-          gh pr comment "$PR" --body-file web-comment.md --edit-last \
-            || gh pr comment "$PR" --body-file web-comment.md
+          gh pr comment "$PR" --body-file web-comment.md
 
       - name: Unggah artifact build web
         if: success()

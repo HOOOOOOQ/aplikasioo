@@ -376,6 +376,59 @@ jobs:
           fi
           echo "Rilis: https://github.com/${GITHUB_REPOSITORY}/releases/tag/latest-apk"
 
+      # Pratinjau: APK dari branch PR (belum digabung ke `main`) dipublikasikan
+      # sebagai pre-release supaya bisa diunduh langsung sebagai file `.apk`.
+      # Artifact Actions butuh login dan berupa zip, sedangkan release `latest-apk`
+      # hanya diperbarui saat push ke `main` — jalur ini tidak menimpanya.
+      - name: Publikasikan APK pratinjau (bukan main)
+        if: github.ref != 'refs/heads/main' && success()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          set -uo pipefail
+          TAG=preview-apk
+          {
+            echo "> **PRATINJAU — belum digabung ke \`main\`.**"
+            echo "> Dibangun dari branch \`${BRANCH}\` (build #${GITHUB_RUN_NUMBER}, commit \`${TARGET_SHA:0:7}\`)."
+            echo "> Rilis resmi: [\`latest-apk\`](../tag/latest-apk)."
+            echo ""
+            cat RELEASE_NOTES.md
+          } > RELEASE_PREVIEW.md
+
+          upload_with_retry() {
+            for attempt in 1 2 3; do
+              echo "Unggah aset pratinjau (percobaan ${attempt})…"
+              if gh release upload "$TAG" dist/*.apk SHA256SUMS.txt --clobber; then
+                return 0
+              fi
+              sleep 10
+            done
+            return 1
+          }
+
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            upload_with_retry || echo "::warning::Unggah aset pratinjau gagal setelah 3 percobaan"
+            gh release edit "$TAG" \
+              --title "EduTask APK pratinjau (build #${GITHUB_RUN_NUMBER})" \
+              --prerelease --notes-file RELEASE_PREVIEW.md \
+              || echo "::warning::Gagal memperbarui catatan release pratinjau"
+          else
+            for attempt in 1 2 3; do
+              if gh release create "$TAG" dist/*.apk SHA256SUMS.txt \
+                --prerelease --target "$TARGET_SHA" \
+                --title "EduTask APK pratinjau (build #${GITHUB_RUN_NUMBER})" \
+                --notes-file RELEASE_PREVIEW.md; then
+                break
+              fi
+              echo "Pembuatan release pratinjau gagal, coba lagi…"
+              sleep 10
+            done
+          fi
+          echo "Pratinjau: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
+
       - name: Upload build log (always)
         if: always()
         uses: actions/upload-artifact@v4
