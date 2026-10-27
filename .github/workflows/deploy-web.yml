@@ -109,6 +109,27 @@ jobs:
             --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
             2>&1 | tee web-deploy-build.log
 
+      # Kegagalan build web di sini sulit didiagnosis dari luar CI (log mentah
+      # tidak selalu bisa diunduh), jadi ringkasannya dikirim ke PR.
+      - name: Ringkasan kegagalan build web
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ ! -f web-deploy-build.log ]; then exit 0; fi
+          {
+            echo '### Kegagalan `flutter build web` (GitHub Pages)'
+            echo
+            echo '```'
+            tail -c 12000 web-deploy-build.log
+            echo '```'
+          } > web-deploy-fail.md
+          cat web-deploy-fail.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "${PR:-}" ]; then
+            gh pr comment "$PR" --body-file web-deploy-fail.md || true
+          fi
+
       - name: Verifikasi artefak web
         run: |
           set -e
