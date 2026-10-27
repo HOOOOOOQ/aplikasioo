@@ -40,6 +40,8 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  # Diperlukan agar ringkasan kegagalan bisa dikirim sebagai komentar PR.
+  pull-requests: write
 
 # Deploy tidak boleh berjalan bersamaan; yang terbaru menang.
 concurrency:
@@ -101,13 +103,22 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          BASE_HREF: ${{ steps.base.outputs.value }}
         run: |
           set -o pipefail
+          : "${BASE_HREF:=/}"
+          echo "[build] base href: $BASE_HREF"
+          # Anon key tidak pernah dicetak ke log.
+          {
+            echo "[build] flutter build web --release --base-href=$BASE_HREF"
+            echo "[build] --dart-define=SUPABASE_URL=(terisi, ${#SUPABASE_URL} karakter)"
+            echo "[build] --dart-define=SUPABASE_ANON_KEY=(disembunyikan, ${#SUPABASE_ANON_KEY} karakter)"
+          } | tee web-deploy-build.log
           flutter build web --release \
-            --base-href="${{ steps.base.outputs.value }}" \
-            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
-            2>&1 | tee web-deploy-build.log
+            "--base-href=$BASE_HREF" \
+            "--dart-define=SUPABASE_URL=$SUPABASE_URL" \
+            "--dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" \
+            2>&1 | tee -a web-deploy-build.log
 
       # Kegagalan build web di sini sulit didiagnosis dari luar CI (log mentah
       # tidak selalu bisa diunduh), jadi ringkasannya dikirim ke PR.
