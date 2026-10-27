@@ -101,14 +101,32 @@ lewat *conditional import* (`lib/core/routing/url_strategy*.dart`,
 `lib/core/services/csv_saver*.dart`), sehingga tidak ada plugin Android yang
 dipanggil di browser.
 
+**Cara tercepat** (skrip sudah menyiapkan `--dart-define`, validasi, dan port):
+
 ```bash
-# 1) Jalankan mode pengembangan di http://localhost:8080
+# 1) Isi kredensial sekali saja (berkas ini tidak pernah di-commit)
+cp .env.web.example .env.web
+#   lalu isi SUPABASE_URL dan SUPABASE_ANON_KEY dari
+#   Supabase Dashboard → Project Settings → API
+
+# 2) Jalankan mode pengembangan di http://localhost:8080
+bash scripts/web/run_web.sh
+
+# 3) Build rilis + pratinjau lokal (opsional)
+bash scripts/web/build_web.sh --serve
+```
+
+Tanpa skrip (perintah Flutter langsung):
+
+```bash
 flutter pub get
-flutter run -d web-server --web-hostname 0.0.0.0 --web-port 8080 \
+
+# mode pengembangan — http://localhost:8080
+flutter run -d web-server --web-hostname 127.0.0.1 --web-port 8080 \
   --dart-define=SUPABASE_URL=https://<project-ref>.supabase.co \
   --dart-define=SUPABASE_ANON_KEY=<anon-key>
 
-# 2) Build rilis (folder build/web)
+# build rilis — hasil di build/web
 flutter build web --release \
   --dart-define=SUPABASE_URL=https://<project-ref>.supabase.co \
   --dart-define=SUPABASE_ANON_KEY=<anon-key>
@@ -116,6 +134,15 @@ flutter build web --release \
 
 Catatan:
 
+- **Kredensial wajib diisi saat build.** `SUPABASE_URL` dan `SUPABASE_ANON_KEY`
+  dibaca lewat `--dart-define` (`lib/core/config/supabase_config.dart`). Build
+  yang dibuat CI memakai nilai *placeholder* agar bisa diuji tanpa rahasia,
+  jadi **hasil build CI tidak bisa login** — untuk mencoba aplikasi, build
+  sendiri dengan kredensial proyek Anda.
+- **Port**: skrip memakai `8080`; ubah dengan `WEB_PORT=9000 bash scripts/web/run_web.sh`.
+  Server pengembangan hanya mengikat `127.0.0.1` secara default; `WEB_HOST=0.0.0.0`
+  membuatnya bisa diakses dari HP di Wi-Fi yang sama — jangan dipakai di jaringan
+  publik karena `flutter run -d web-server` tidak punya autentikasi.
 - **URL**: default memakai *hash strategy* (`http://localhost:8080/#/admin`) agar
   refresh/Back bekerja di semua static server tanpa rewrite. Untuk URL bersih
   (`/admin`) build ulang dengan `--dart-define=USE_PATH_URL_STRATEGY=true` dan

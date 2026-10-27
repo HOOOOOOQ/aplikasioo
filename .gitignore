@@ -106,3 +106,9 @@ supabase/.temp/
 # EduTask local config (jangan commit key asli)
 lib/core/config/supabase_local.dart
 .vscode/launch.json
+
+# Kredensial lokal untuk Web (tidak pernah di-commit)
+.env.web
+.env.web.*
+!.env.web.example
+
