@@ -102,7 +102,7 @@ class _AdminReportsPageState extends ConsumerState<AdminReportsPage> {
       final bytes = await ReportPdfBuilder.build(doc);
       if (!mounted) return;
 
-      final native = PdfExporter.supportsNativePdfDialog;
+      const native = PdfExporter.supportsNativePdfDialog;
       final action = await showModalBottomSheet<_PdfAction>(
         context: context,
         showDragHandle: true,

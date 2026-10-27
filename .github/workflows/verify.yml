@@ -71,6 +71,21 @@ jobs:
           set -o pipefail
           flutter test 2>&1 | tee test.log
 
+      # Ringkasan kegagalan masuk ke job summary supaya nama tes yang gagal
+      # terbaca tanpa mengunduh log mentah (log mentah tidak selalu bisa
+      # diakses dari luar).
+      - name: Ringkasan kegagalan test
+        if: failure()
+        run: |
+          if [ ! -f test.log ]; then exit 0; fi
+          {
+            echo '### Tes yang gagal'
+            echo
+            echo '```'
+            grep -nE "\[E\]" -A 25 test.log | head -200 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Publikasikan hasil test ke PR
         if: always() && github.event_name == 'pull_request'
         env:
@@ -138,6 +153,18 @@ jobs:
           echo "Ukuran build/web:" && du -sh build/web
           echo "Jumlah berkas:" && find build/web -type f | wc -l
           find build/web -maxdepth 1 -type f -printf '%f\n' | sort
+
+      - name: Ringkasan kegagalan build web
+        if: failure()
+        run: |
+          if [ ! -f web-build.log ]; then exit 0; fi
+          {
+            echo '### Kegagalan flutter build web'
+            echo
+            echo '```'
+            tail -c 12000 web-build.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publikasikan hasil build web ke PR
         if: always() && github.event_name == 'pull_request'

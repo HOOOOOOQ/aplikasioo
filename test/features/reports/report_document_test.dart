@@ -178,7 +178,7 @@ void main() {
 
   group('ReportFilter', () {
     test('label cakupan dan periode', () {
-      final filter = const ReportFilter(
+      const filter = ReportFilter(
         kelasId: 'k1',
         kelasNama: 'X PPLG 1',
         mapelNama: 'Pemrograman',
