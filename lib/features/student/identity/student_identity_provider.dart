@@ -379,17 +379,6 @@ class LocalTaskStatusNotifier extends StateNotifier<Map<String, String>> {
   String getStatus(String tugasId) => state[tugasId] ?? 'belum_selesai';
 }
 
-/// Helper kecil dipakai halaman untuk membaca isi token tanpa verifikasi
-/// (hanya untuk menampilkan "sesi berakhir" — keputusan tetap di server).
-DateTime? accessTokenExpiry(String? token) {
-  if (token == null || token.isEmpty) return null;
-  final parts = token.split('.');
-  if (parts.length < 2) return null;
-  final exp = int.tryParse(parts[1]);
-  if (exp == null) return null;
-  return DateTime.fromMillisecondsSinceEpoch(exp * 1000);
-}
-
 /// Utilitas untuk mem-parse pesan error dari body JSON Edge Function.
 String describeFunctionDetails(dynamic details) {
   if (details is Map) {
