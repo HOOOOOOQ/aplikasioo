@@ -479,7 +479,7 @@ dari CI.
 | `flutter test` | **TERVERIFIKASI CI** | **210 tes lulus** (sebelumnya 162; +48 tes baru ronde ini: 42 fitur, 3 pemetaan error, 3 konsistensi CSV ↔ PDF + label periode). |
 | `flutter build web --release` | **TERVERIFIKASI CI** | Sukses (job `web-build` hijau). Pemeriksaan artefak lolos: `index.html`, `manifest.json`, `flutter_bootstrap.js`, `main.dart.js`, `flutter_service_worker.js`, ikon 192 px ada; teks `EduTask` ada di `index.html`; **tidak ada** string `service_role` di bundle. Ukuran pasti tidak ditampilkan di komentar PR (ada di log job). |
 | `flutter build apk --release` | **TERVERIFIKASI CI** | **APK build #96** sukses: universal 67 MB (versionCode 96), arm64-v8a 27 MB (2096), armeabi-v7a 25 MB (1096), x86_64 28 MB (4096); `applicationId com.edutask.sekolah`, `minSdk 24`, `targetSdk 36`, ditandatangani kunci uji yang sama (`f3d985e4…ffcbf9`). |
-| `install-test` (emulator x86_64) | **GAGAL — INFRASTRUKTUR CI** | Terjadi pada build #91, #93, dan #96: emulator tidak menghasilkan log smoke test (`emulator gagal boot / action gagal sebelum skrip`). Langkah ini memakai `continue-on-error`, jadi job tetap hijau, tetapi **instalasi APK belum terbukti** lewat CI. |
+| `install-test` (emulator x86_64) | **GAGAL — INFRASTRUKTUR CI** | Terjadi pada setiap percobaan (#91, #93, #96, #98): emulator tidak menghasilkan log smoke test (`emulator gagal boot / action gagal sebelum skrip`). Langkah ini memakai `continue-on-error`, jadi job tetap hijau, tetapi **instalasi APK belum terbukti** lewat CI. |
 | Uji pin/PDF manual di perangkat nyata | **BELUM TERVERIFIKASI** | Butuh perangkat + database live. |
 | Uji di browser nyata | **BELUM TERVERIFIKASI** | Butuh browser + Supabase live. |
 | Migration di database produksi | **BELUM DIJALANKAN** | Jalankan manual (bagian 3.1). |
@@ -497,7 +497,7 @@ Detail APK build #96 (`SHA256SUMS.txt` lengkap ada di komentar PR):
 > Actions). Release `latest-apk` belum diperbarui karena workflow APK hanya
 > memublikasikan release saat push ke `main` — yaitu setelah PR ini digabung.
 
-Catatan penting soal `install-test`: pada build #91, #93, dan #96 langkah emulator **gagal**
+Catatan penting soal `install-test`: pada build #91, #93, #96, dan #98 langkah emulator **gagal**
 (emulator tidak boot / action gagal sebelum skrip dijalankan) sehingga tidak ada
 bukti instalasi dari CI. Karena langkah itu `continue-on-error: true`, status
 job tetap hijau — angka "hijau" di atas **tidak** boleh dibaca sebagai bukti
