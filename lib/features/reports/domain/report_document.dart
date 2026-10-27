@@ -74,8 +74,10 @@ class ReportFilter {
   /// Label periode, mis. "1 Sep 2026 – 30 Sep 2026".
   String get periodLabel {
     if (!hasPeriod) return 'Semua periode';
-    final start = from == null ? 'awal' : AppDateUtils.formatTanggal(from, pattern: 'd MMM yyyy');
-    final end = to == null ? 'sekarang' : AppDateUtils.formatTanggal(to, pattern: 'd MMM yyyy');
+    final start =
+        from == null ? 'awal' : AppDateUtils.formatTanggalKalender(from!, pattern: 'd MMM yyyy');
+    final end =
+        to == null ? 'sekarang' : AppDateUtils.formatTanggalKalender(to!, pattern: 'd MMM yyyy');
     return '$start – $end';
   }
 
@@ -99,8 +101,8 @@ class ReportFilter {
       'laporan-tugas',
       if (kelasNama != null && kelasNama!.trim().isNotEmpty) kelasNama!,
       if (mapelNama != null && mapelNama!.trim().isNotEmpty) mapelNama!,
-      if (from != null) AppDateUtils.formatTanggal(from, pattern: 'yyyyMMdd'),
-      if (to != null) AppDateUtils.formatTanggal(to, pattern: 'yyyyMMdd'),
+      if (from != null) AppDateUtils.formatTanggalKalender(from!, pattern: 'yyyyMMdd'),
+      if (to != null) AppDateUtils.formatTanggalKalender(to!, pattern: 'yyyyMMdd'),
     ];
     final safe = bits
         .join('-')

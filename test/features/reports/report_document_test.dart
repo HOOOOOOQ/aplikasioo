@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
+import 'package:edutask/core/services/csv_builder.dart';
 import 'package:edutask/features/reports/domain/report_document.dart';
 import 'package:edutask/shared/models/tugas.dart';
 import 'package:edutask/shared/repositories/tugas_repository.dart';
@@ -209,6 +211,74 @@ void main() {
       );
       expect(filter.copyWith(clearKelas: true).kelasId, isNull);
       expect(filter.copyWith(clearPeriod: true).hasPeriod, isFalse);
+    });
+  });
+
+  group('Konsistensi CSV ↔ PDF', () {
+    test('CSV memakai baris tabel yang sama dengan PDF', () {
+      final doc = ReportDocument.from(
+        source: [
+          row(id: 'a', judul: 'Struktur Data', total: 30, selesai: 20, terlambat: 1),
+          row(id: 'b', judul: 'Basis Data', total: 30, selesai: 15, terlambat: 2),
+        ],
+        filter: const ReportFilter(kelasNama: 'X PPLG 1'),
+        generatedAt: DateTime(2026, 10, 27, 9, 30),
+      );
+
+      final table = doc.toTableRows();
+      final csv = CsvBuilder.build(table);
+      final csvRows = csv
+          .split('\r\n')
+          .where((line) => line.trim().isNotEmpty)
+          .toList();
+
+      // Jumlah baris dan header harus identik antara CSV dan PDF.
+      expect(csvRows.length, table.length);
+      expect(csvRows.first, ReportDocument.headers.join(','));
+      // Setiap baris data memuat seluruh nilai sel (yang mengandung koma
+      // dikutip oleh CsvBuilder, jadi tidak dipecah dengan split(',')).
+      for (final cells in table.skip(1)) {
+        for (final cell in cells) {
+          expect(csv, contains(CsvBuilder.escape(cell)),
+              reason: 'sel "$cell" harus muncul di CSV');
+        }
+      }
+      // Nilai statistik yang dipakai ringkasan PDF berasal dari baris yang sama.
+      expect(csv, contains('Struktur Data'));
+      expect(csv, contains('40.0%'));
+      expect(csv, contains('"')); // tanggal "08 Jan 2026, 10:00" dikutip
+    });
+
+    test('nama berkas CSV dan PDF memakai periode yang dipilih apa adanya', () {
+      final filter = ReportFilter(
+        kelasNama: 'X PPLG 1',
+        from: DateTime(2026, 1, 1),
+        to: DateTime(2026, 1, 31),
+      );
+      final doc = ReportDocument.from(
+        source: [row()],
+        filter: filter,
+        generatedAt: DateTime(2026, 10, 27, 9, 5),
+      );
+      // Tanggal periode tidak boleh bergeser karena konversi zona waktu.
+      expect(doc.fileNameStem, contains('20260101'));
+      expect(doc.fileNameStem, contains('20260131'));
+    });
+  });
+
+  group('Label periode', () {
+    test('memakai tanggal kalender apa adanya (tanpa geser zona waktu)', () {
+      final filter = ReportFilter(
+        from: DateTime(2026, 1, 1),
+        to: DateTime(2026, 1, 31),
+      );
+      final fmt = DateFormat('d MMM yyyy', 'id_ID');
+      expect(
+        filter.periodLabel,
+        '${fmt.format(DateTime(2026, 1, 1))} – ${fmt.format(DateTime(2026, 1, 31))}',
+      );
+      expect(filter.periodLabel.startsWith('1 '), isTrue);
+      expect(filter.periodLabel, contains('31 '));
     });
   });
 

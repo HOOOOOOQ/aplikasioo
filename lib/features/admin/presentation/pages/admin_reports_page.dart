@@ -55,13 +55,28 @@ class _AdminReportsPageState extends ConsumerState<AdminReportsPage> {
 
   Future<void> _pickPeriod() async {
     final now = DateTime.now();
+    final firstDate = DateTime(now.year - 3);
+    final lastDate = DateTime(now.year + 3, 12, 31);
+
+    // `initialDateRange` wajib di dalam [firstDate, lastDate]; nilai lama bisa
+    // berada di luar jendela ini bila filter disimpan lama atau jam perangkat
+    // berubah, sehingga di-clamp agar picker tidak melempar assertion.
+    DateTimeRange? initialRange;
+    final from = _filter.from;
+    final to = _filter.to;
+    if (from != null && to != null) {
+      final start = from.isBefore(firstDate) ? firstDate : from;
+      final end = to.isAfter(lastDate) ? lastDate : to;
+      if (!start.isAfter(end)) {
+        initialRange = DateTimeRange(start: start, end: end);
+      }
+    }
+
     final picked = await showDateRangePicker(
       context: context,
-      firstDate: DateTime(now.year - 3),
-      lastDate: DateTime(now.year + 3, 12, 31),
-      initialDateRange: _filter.from != null && _filter.to != null
-          ? DateTimeRange(start: _filter.from!, end: _filter.to!)
-          : null,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      initialDateRange: initialRange,
       helpText: 'Pilih periode tenggat tugas',
     );
     if (picked == null || !mounted) return;
