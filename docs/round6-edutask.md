@@ -466,8 +466,9 @@ indikator "Menyiapkan…" selama proses.
 ## 9. Hasil verifikasi
 
 Diuji lewat GitHub Actions pada branch `arena/860055b9-aplikasioo`, commit
-`d7edd4e` (PR #66). Tidak ada pemeriksaan di bawah ini yang dijalankan di
-laptop pengembang — semua berasal dari CI.
+**`2952773`** (PR #66) — commit terakhir yang mengubah kode. Tidak ada
+pemeriksaan di bawah ini yang dijalankan di laptop pengembang; semuanya berasal
+dari CI.
 
 | Pemeriksaan | Status | Hasil |
 |---|---|---|
@@ -475,28 +476,28 @@ laptop pengembang — semua berasal dari CI.
 | Parser SQL 7 migration | **SELESAI (lokal)** | 7/7 lolos `pgsql-parser`. |
 | `flutter pub get` | **TERVERIFIKASI CI** | Sukses (job `analyze-test`, `web-build`, `build`). |
 | `flutter analyze --no-fatal-infos --no-fatal-warnings` | **TERVERIFIKASI CI** | **0 error, 0 warning, 4 info** (semuanya info lama di `back_guard.dart` & `session_guard.dart`, bukan dari ronde ini). |
-| `flutter test` | **TERVERIFIKASI CI** | **204 tes lulus** (sebelumnya 162; +42 tes baru ronde ini). |
+| `flutter test` | **TERVERIFIKASI CI** | **207 tes lulus** (sebelumnya 162; +45 tes baru ronde ini: 42 fitur + 3 pemetaan error). |
 | `flutter build web --release` | **TERVERIFIKASI CI** | Sukses (job `web-build` hijau). Pemeriksaan artefak lolos: `index.html`, `manifest.json`, `flutter_bootstrap.js`, `main.dart.js`, `flutter_service_worker.js`, ikon 192 px ada; teks `EduTask` ada di `index.html`; **tidak ada** string `service_role` di bundle. Ukuran pasti tidak ditampilkan di komentar PR (ada di log job). |
-| `flutter build apk --release` | **TERVERIFIKASI CI** | **APK build #91** sukses: universal 67 MB, arm64-v8a 27 MB, armeabi-v7a 25 MB, x86_64 28 MB; `applicationId com.edutask.sekolah`, `minSdk 24`, `targetSdk 36`, ditandatangani kunci uji yang sama (`f3d985e4…ffcbf9`). |
-| `install-test` (emulator x86_64) | **GAGAL — INFRASTRUKTUR CI** | Emulator tidak menghasilkan log smoke test (`emulator gagal boot / action gagal sebelum skrip`). Langkah ini memakai `continue-on-error`, jadi job tetap hijau, tetapi **instalasi APK belum terbukti** lewat CI. |
+| `flutter build apk --release` | **TERVERIFIKASI CI** | **APK build #93** sukses: universal 67 MB (versionCode 93), arm64-v8a 27 MB (2093), armeabi-v7a 25 MB (1093), x86_64 28 MB (4093); `applicationId com.edutask.sekolah`, `minSdk 24`, `targetSdk 36`, ditandatangani kunci uji yang sama (`f3d985e4…ffcbf9`). |
+| `install-test` (emulator x86_64) | **GAGAL — INFRASTRUKTUR CI** | Terjadi pada build #91 **dan** #93: emulator tidak menghasilkan log smoke test (`emulator gagal boot / action gagal sebelum skrip`). Langkah ini memakai `continue-on-error`, jadi job tetap hijau, tetapi **instalasi APK belum terbukti** lewat CI. |
 | Uji pin/PDF manual di perangkat nyata | **BELUM TERVERIFIKASI** | Butuh perangkat + database live. |
 | Uji di browser nyata | **BELUM TERVERIFIKASI** | Butuh browser + Supabase live. |
 | Migration di database produksi | **BELUM DIJALANKAN** | Jalankan manual (bagian 3.1). |
 
-Detail APK build #91 (`SHA256SUMS.txt` lengkap ada di komentar PR):
+Detail APK build #93 (`SHA256SUMS.txt` lengkap ada di komentar PR):
 
-| File | Ukuran | SHA-256 |
-|---|---|---|
-| `EduTask-1.2.0-arm64-v8a.apk` | 27 MB | `8d09034f9d888a293ab024a27854bec7b39090f6b98c422ee5933bbf433057fb` |
-| `EduTask-1.2.0-armeabi-v7a.apk` | 25 MB | `de220c37ea94e15f1cfb61285dcbc5993e0ef9dc988095a6139ae3ea85fd8b9f` |
-| `EduTask-1.2.0-universal.apk` | 67 MB | `eea1b619dddc5f33c9e247ce6c11c0aeb4c1d4093b26db03a7e3f6d29b725003` |
-| `EduTask-1.2.0-x86_64.apk` | 28 MB | `31a0829f2ab6cf7aeca8288188c67d9ca06995ff4fe187e624d5c1a3bd3b7e69` |
+| File | Ukuran | versionCode | SHA-256 |
+|---|---|---|---|
+| `EduTask-1.2.0-arm64-v8a.apk` | 27 MB | 2093 | `96651cd44030d412a6ab4a9bbd69e85f8cd799aa83c6532058151d2cf40e47c1` |
+| `EduTask-1.2.0-armeabi-v7a.apk` | 25 MB | 1093 | `350930cd2c4b1fac6a6b41dd7be286b1009dce44f47a28221babd7a8e01a687c` |
+| `EduTask-1.2.0-universal.apk` | 67 MB | 93 | `94a8effc1879aa0b81eacce2435b800b004565d2531b0b49729444d54255bdd7` |
+| `EduTask-1.2.0-x86_64.apk` | 28 MB | 4093 | `b160e02a153b84cac3bfb2c83c1961c98e1007313818ba5199cf6eed0b18bfc0` |
 
-> APK pada build #91 adalah artefak **job CI** (bisa diunduh dari halaman run).
-> Release `latest-apk` belum diperbarui karena workflow APK hanya memublikasikan
-> release saat push ke `main` — yaitu setelah PR ini digabung.
+> APK pada build #93 adalah artefak **job CI** (bisa diunduh dari halaman run
+> Actions). Release `latest-apk` belum diperbarui karena workflow APK hanya
+> memublikasikan release saat push ke `main` — yaitu setelah PR ini digabung.
 
-Catatan penting soal `install-test`: pada build #91 langkah emulator **gagal**
+Catatan penting soal `install-test`: pada build #91 dan #93 langkah emulator **gagal**
 (emulator tidak boot / action gagal sebelum skrip dijalankan) sehingga tidak ada
 bukti instalasi dari CI. Karena langkah itu `continue-on-error: true`, status
 job tetap hijau — angka "hijau" di atas **tidak** boleh dibaca sebagai bukti
@@ -522,7 +523,7 @@ Error: The method 'decodeLazy' isn't defined for the type 'ZLibDecoder'.
 * **Perbaikan:** `image: '>=4.10.0 <4.11.0'` di `pubspec.yaml` (4.10.x memakai
   `decodeBytes`, aman dengan `archive 4.0.9`). Komentar di pubspec menjelaskan
   alasan dan kapan pin ini boleh dilepas.
-* **Bukti:** setelah pin, `analyze` 0 error, `flutter test` 204 lulus,
+* **Bukti:** setelah pin, `analyze` 0 error, `flutter test` 207 lulus,
   `build web` sukses, `build apk` sukses.
 
 ### 9.2 Perbaikan diagnosa CI
