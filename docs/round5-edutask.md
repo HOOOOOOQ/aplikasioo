@@ -312,31 +312,41 @@ Pemeriksaan tambahan di lingkungan tanpa SDK:
 - Satu kegagalan awal (`label platform` berbeda kapitalisasi di lingkungan
   test) diperbaiki pada penyebabnya — bukan dengan menghapus test.
 
-## 10. Build APK — TERVERIFIKASI CI
+## 10. Build APK — TERVERIFIKASI CI + TERBIT
 
-Workflow **Build EduTask APK** berhasil pada PR ini (**build #83**), termasuk
-job **install-test di emulator Android x86_64** yang memasang APK dan melakukan
-*cold start* (status job: **SUCCESS**).
+Validasi PR berjalan pada **build #83** (termasuk job **install-test di emulator
+Android x86_64**: APK dipasang dan di-*cold start*, status **SUCCESS**).
+
+Setelah PR digabung, workflow `main` menerbitkan APK ronde 5:
+**release `latest-apk` = build #87 (commit `9ee5e56`)**.
 
 | Item | Nilai |
 |---|---|
-| Berkas | `EduTask-1.2.0-arm64-v8a.apk` (disarankan), `armeabi-v7a`, `x86_64`, `universal` |
-| Ukuran | 26 MB / 24 MB / 27 MB / 65 MB |
-| SHA-256 (arm64) | `2ee70a109a4fb1477df30a940a5ff2337aab6ed6e34745abaabef3f5febb8b14` |
-| SHA-256 (armeabi-v7a) | `202b6aefee283dea2f390c290d8d981912337054f330e1b740f3045f46ad7919` |
-| SHA-256 (x86_64) | `854ef5a2d675abe8e22ebe53215cd49f4bd26d176898131c89e92ddeaa10515b` |
-| SHA-256 (universal) | `cfd7ff978f5082cadba34711f25a40e9e8998e955aa5348f207ab4c3b299eed4` |
+| Berkas | `EduTask-1.2.0-arm64-v8a.apk` (disarankan), `-armeabi-v7a`, `-universal`, `-x86_64` |
+| Ukuran | 26.999.641 B / 24.886.111 B / 67.214.630 B / 28.171.088 B |
+| SHA-256 (arm64-v8a) | `5ee0b9a7817b5777a2911d6be97d3fbe6ca6a851f87963276810c25092c4c256` |
+| SHA-256 (armeabi-v7a) | `b98a603ed0d077d804894196086181066b337f0d27385175679b0e5551a0a964` |
+| SHA-256 (universal) | `11c503d5bff1c0e37fa2cf352295d490d75d317f6fca28307edee9d43ea7baa7` |
+| SHA-256 (x86_64) | `11b09050c01333109c4c2eab79fce11538e9de7aad1d41259a230a11a7e9e9b7` |
 | applicationId | `com.edutask.sekolah` |
-| versionCode | 83 (universal) / 2083 (arm64) / 1083 (armeabi-v7a) / 4083 (x86_64) |
+| versionCode | 87 (universal) / 2087 / 1087 / 4087 |
 | versionName | `1.2.0` |
-| minSdk / targetSdk / compileSdk | 24 / 36 / 36 |
+| minSdk / targetSdk | 24 / 36 |
 | Tanda tangan | v2 + v3 **valid**, 1 signer, sertifikat `C=ID, O=EduTask Sekolah, CN=EduTask`, SHA-256 `f3d985e457b01512b34091c25826869ed48fe9efd42b988375fc401562ffcbf9` (keystore uji yang di-commit — **bukan** kunci Play Store) |
-| Unduh (setelah merge) | `https://github.com/HOOOOOOQ/aplikasioo/releases/tag/latest-apk` |
+| Unduh | `https://github.com/HOOOOOOQ/aplikasioo/releases/tag/latest-apk` |
 
-Catatan: workflow hanya mempublikasikan APK ke Release pada push ke `main`
-(`github.event_name != 'pull_request'`). Sebelum merge, APK ronde 5 tersedia
-sebagai artifact job `build` pada PR, sedangkan Release `latest-apk` masih
-berisi build #80 (ronde 4). Setelah merge, Release akan diperbarui otomatis.
+Tautan unduh langsung:
+
+```
+https://github.com/HOOOOOOQ/aplikasioo/releases/download/latest-apk/EduTask-1.2.0-arm64-v8a.apk
+https://github.com/HOOOOOOQ/aplikasioo/releases/download/latest-apk/EduTask-1.2.0-armeabi-v7a.apk
+https://github.com/HOOOOOOQ/aplikasioo/releases/download/latest-apk/EduTask-1.2.0-universal.apk
+https://github.com/HOOOOOOQ/aplikasioo/releases/download/latest-apk/SHA256SUMS.txt
+```
+
+Catatan: APK ditandatangani keystore uji yang di-commit di repo agar tanda
+tangan stabil antar build sideload. Ini **bukan** kunci Play Store; jangan
+unggah ke Play Console.
 
 ## 11. Build Web
 
