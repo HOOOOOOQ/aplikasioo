@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:edutask/core/navigation/back_guard.dart';
 import 'package:edutask/core/routing/app_router.dart';
 import 'package:edutask/features/auth/domain/app_user.dart';
 
