@@ -24,11 +24,11 @@ const List<_OnboardingStep> _steps = [
   _OnboardingStep(
     title: 'Kenali EduTask',
     description:
-        'EduTask membantu mengelola tugas, jadwal sekolah, pengumuman, dan komunikasi '
-        'pembelajaran dalam satu aplikasi.',
+        'EduTask mengelola tugas, jadwal, pengumuman, dan komunikasi pembelajaran '
+        'dalam satu aplikasi untuk admin, guru, dan siswa.',
     icon: Icons.school_rounded,
     color: AppColors.primary,
-    highlights: ['Jadwal & tugas terpusat', 'Untuk admin, guru, dan siswa'],
+    highlights: ['Jadwal & tugas terpusat', 'Bisa dipakai di Android dan browser'],
   ),
   _OnboardingStep(
     title: 'Masuk sebagai Guru atau Admin',
@@ -40,31 +40,58 @@ const List<_OnboardingStep> _steps = [
     highlights: ['Guru mengelola tugas & jadwal kelasnya', 'Admin mengelola data sekolah'],
   ),
   _OnboardingStep(
-    title: 'Siswa: Tugas & Jadwal',
+    title: 'Siswa: Hubungkan Kode Akses',
     description:
-        'Siswa dapat melihat jadwal pelajaran dan daftar tugas tanpa login. '
-        'Tenggat waktu dan instruksi tampil langsung di beranda.',
-    icon: Icons.assignment_turned_in_rounded,
-    color: AppColors.success,
-    highlights: ['Filter tugas & tenggat', 'Jadwal mingguan per kelas'],
-  ),
-  _OnboardingStep(
-    title: 'Hubungkan Identitas via Kode Akses',
-    description:
-        'Kode akses diberikan guru atau admin. Setelah dihubungkan, siswa dapat mengirim '
-        'jawaban tugas, melihat nilai, dan mengikuti diskusi kelas.',
-    icon: Icons.verified_user_rounded,
+        'Minta kode akses kepada guru atau admin, lalu masukkan pada tab Identitas. '
+        'Kode dibuat di server, sekali pakai, dan hanya berlaku untuk kelas Anda.',
+    icon: Icons.vpn_key_rounded,
     color: AppColors.warning,
-    highlights: ['Kode sekali pakai dari guru', 'Tidak perlu password siswa'],
+    highlights: ['Tanpa password siswa', 'Kode tidak dapat dipakai ulang'],
   ),
   _OnboardingStep(
-    title: 'Notifikasi, Chat, dan Pengumpulan',
+    title: 'Jadwal & Tugas',
     description:
-        'Pantau pengumuman, kirim pesan ke guru atau grup kelas, dan kumpulkan tugas '
-        'tepat waktu. Semua pemberitahuan tersimpan di pusat notifikasi.',
+        'Lihat jadwal pelajaran mingguan, daftar tenggat, dan detail tugas. Tenggat '
+        'mendekat ditandai warna agar tidak terlewat.',
+    icon: Icons.calendar_month_rounded,
+    color: AppColors.success,
+    highlights: ['Kalender tenggat', 'Pengingat sebelum tenggat'],
+  ),
+  _OnboardingStep(
+    title: 'Kerjakan & Kumpulkan Tugas',
+    description:
+        'Buka detail tugas, tulis jawaban, lalu kirim. Riwayat revisi, nilai, dan '
+        'umpan balik guru tampil di halaman yang sama.',
+    icon: Icons.assignment_turned_in_rounded,
+    color: AppColors.primaryLight,
+    highlights: ['Kirim ulang saat revisi', 'Nilai & umpan balik guru'],
+  ),
+  _OnboardingStep(
+    title: 'Chat dengan Guru',
+    description:
+        'Tanyakan hal yang belum jelas lewat chat pribadi dengan guru pengampu atau '
+        'grup kelas. Pesan hanya dapat dibaca anggota percakapan.',
     icon: Icons.forum_rounded,
-    color: AppColors.primary,
-    highlights: ['Chat privat & grup kelas', 'Nilai dan umpan balik guru'],
+    color: AppColors.primaryDark,
+    highlights: ['Chat pribadi & grup kelas', 'Indikator belum dibaca'],
+  ),
+  _OnboardingStep(
+    title: 'Pengumuman & Notifikasi',
+    description:
+        'Informasi sekolah muncul di Pengumuman, sedangkan tugas baru, nilai, dan '
+        'pesan masuk tersimpan di pusat Notifikasi.',
+    icon: Icons.campaign_rounded,
+    color: AppColors.info,
+    highlights: ['Pengumuman per kelas', 'Status sudah dibaca'],
+  ),
+  _OnboardingStep(
+    title: 'Cari Bantuan',
+    description:
+        'Buka Bantuan & FAQ dari Pengaturan atau menu utama. Tutorial ini juga dapat '
+        'diputar ulang kapan saja dari Pengaturan.',
+    icon: Icons.help_outline_rounded,
+    color: AppColors.textSecondary,
+    highlights: ['FAQ per peran', 'Tentang EduTask'],
   ),
 ];
 
@@ -96,9 +123,17 @@ class _OnboardingPageState extends State<OnboardingPage> {
     await OnboardingService.markCompleted();
     if (!mounted) return;
 
+    // Rute asal dikirim lewat query `from` saat tutorial diputar ulang dari
+    // Pengaturan, sehingga pengguna kembali ke dashboard perannya — bukan
+    // terlempar ke halaman login.
+    final from = GoRouterState.of(context).uri.queryParameters['from'];
+    final safeFrom = (from != null && from.startsWith('/') && !from.startsWith('//')) ? from : null;
+
     // Jika dibuka dari halaman login (push), kembali ke sana tanpa mengubah sesi.
     if (context.canPop()) {
       context.pop();
+    } else if (safeFrom != null) {
+      context.go(safeFrom);
     } else {
       context.go('/login');
     }

@@ -17,8 +17,11 @@ import '../../features/admin/presentation/pages/admin_tasks_page.dart';
 import '../../features/admin/presentation/pages/admin_teachers_page.dart';
 import '../../features/auth/domain/app_user.dart';
 import '../../features/auth/presentation/auth_provider.dart';
+import '../../features/access_codes/presentation/access_code_history_page.dart';
 import '../../features/access_codes/presentation/access_codes_page.dart';
 import '../../features/auth/presentation/login_page.dart';
+import '../../features/auth/presentation/session_page.dart';
+import '../../features/help/presentation/help_page.dart';
 import '../../features/onboarding/presentation/onboarding_page.dart';
 import '../../features/student/identity/student_identity_page.dart';
 import '../../features/student/presentation/pages/student_main_page.dart';
@@ -35,6 +38,8 @@ import '../../features/teacher/presentation/pages/teacher_task_status_page.dart'
 import '../../features/teacher/presentation/pages/teacher_tasks_page.dart';
 import '../../features/akademik/domain/akademik_models.dart';
 import '../../features/akademik/presentation/chat_room_page.dart';
+import '../../features/akademik/presentation/guru_kelas_page.dart';
+import '../../features/akademik/presentation/tenggat_page.dart';
 import '../../features/akademik/presentation/chat_threads_page.dart';
 import '../../features/akademik/presentation/kalender_page.dart';
 import '../../features/akademik/presentation/notifikasi_page.dart';
@@ -60,6 +65,9 @@ const List<String> studentTabRoutes = [
   '/siswa/chat',
   '/siswa/notifikasi',
   '/siswa/pengaturan',
+  '/siswa/tenggat',
+  '/siswa/guru',
+  '/siswa/bantuan',
 ];
 
 /// Tab level atas untuk shell admin.
@@ -135,6 +143,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/onboarding', builder: (ctx, s) => const OnboardingPage()),
       GoRoute(path: '/login', builder: (ctx, s) => const LoginPage()),
       GoRoute(
+        path: '/bantuan',
+        builder: (ctx, s) {
+          final from = s.uri.queryParameters['from'] ?? 'siswa';
+          final role = from == 'admin' || from == 'guru' ? from : 'siswa';
+          return SimpleBackGuard(
+            fallbackRoute: '/login',
+            child: HelpPage(role: role, fallbackRoute: '/login'),
+          );
+        },
+      ),
+      GoRoute(
         path: '/tentang',
         builder: (ctx, s) {
           final from = s.uri.queryParameters['from'];
@@ -207,6 +226,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/siswa/pencarian',
         builder: (ctx, s) => _siswaGuard(const PencarianPage(audience: AkademikAudience.siswa)),
       ),
+      GoRoute(path: '/siswa/tenggat', builder: (ctx, s) => _siswaGuard(const TenggatPage())),
+      GoRoute(path: '/siswa/guru', builder: (ctx, s) => _siswaGuard(const GuruKelasPage())),
+      GoRoute(
+        path: '/siswa/bantuan',
+        builder: (ctx, s) => _siswaGuard(
+          const HelpPage(role: 'siswa', fallbackRoute: '/siswa'),
+        ),
+      ),
 
       // ---------- Admin ----------
       ShellRoute(
@@ -249,6 +276,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/admin/akun', builder: (ctx, s) => const AdminAccountsPage()),
           GoRoute(path: '/admin/audit', builder: (ctx, s) => const AdminAuditPage()),
           GoRoute(path: '/admin/pengaturan', builder: (ctx, s) => const AdminSettingsPage()),
+          GoRoute(
+            path: '/admin/riwayat-kode',
+            builder: (ctx, s) => const AccessCodeHistoryPage(),
+          ),
+          GoRoute(
+            path: '/admin/bantuan',
+            builder: (ctx, s) => const HelpPage(role: 'admin', fallbackRoute: '/admin'),
+          ),
+          GoRoute(
+            path: '/admin/sesi',
+            builder: (ctx, s) => const SessionPage(),
+          ),
           GoRoute(
             path: '/admin/pengumuman',
             builder: (ctx, s) => const PengumumanPage(audience: AkademikAudience.staff),
@@ -315,6 +354,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(path: '/guru/kode-akses', builder: (ctx, s) => const AccessCodesPage(isTeacher: true)),
           GoRoute(path: '/guru/profil', builder: (ctx, s) => const TeacherProfilePage()),
+          GoRoute(
+            path: '/guru/riwayat-kode',
+            builder: (ctx, s) => const AccessCodeHistoryPage(),
+          ),
+          GoRoute(
+            path: '/guru/bantuan',
+            builder: (ctx, s) => const HelpPage(role: 'guru', fallbackRoute: '/guru'),
+          ),
+          GoRoute(
+            path: '/guru/sesi',
+            builder: (ctx, s) => const SessionPage(),
+          ),
           GoRoute(
             path: '/guru/pengumuman',
             builder: (ctx, s) => const PengumumanPage(audience: AkademikAudience.staff),

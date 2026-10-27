@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/config/app_info.dart';
+import '../../../core/services/app_version.dart';
 import '../../../core/config/supabase_config.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/app_error.dart';
@@ -268,13 +269,22 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       spacing: AppSpacing.xs,
                       children: [
                         TextButton(
+                          onPressed: () => context.push('/bantuan?from=siswa'),
+                          child: const Text('Bantuan'),
+                        ),
+                        const Text(
+                          '•',
+                          style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
+                        ),
+                        TextButton(
                           onPressed: () => context.push('/tentang'),
                           child: const Text('Tentang EduTask'),
                         ),
-                        Text(
-                          '• v${AppInfo.version}',
-                          style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
+                        const Text(
+                          '•',
+                          style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
                         ),
+                        const AppVersionLabel(fontSize: 11),
                       ],
                     ),
                   ),

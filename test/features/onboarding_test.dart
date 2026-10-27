@@ -63,6 +63,37 @@ void main() {
       expect(find.text('Kenali EduTask'), findsOneWidget);
     });
 
+    testWidgets('tutorial memiliki 8 langkah sesuai alur', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: OnboardingPage()),
+      );
+      await tester.pumpAndSettle();
+
+      const titles = [
+        'Kenali EduTask',
+        'Masuk sebagai Guru atau Admin',
+        'Siswa: Hubungkan Kode Akses',
+        'Jadwal & Tugas',
+        'Kerjakan & Kumpulkan Tugas',
+        'Chat dengan Guru',
+        'Pengumuman & Notifikasi',
+        'Cari Bantuan',
+      ];
+
+      expect(find.text(titles.first), findsOneWidget);
+      expect(find.text('Langkah 1 dari ${titles.length}'), findsOneWidget);
+
+      for (var i = 1; i < titles.length; i++) {
+        await tester.tap(find.text('Lanjut'));
+        await tester.pumpAndSettle();
+        expect(find.text(titles[i]), findsOneWidget);
+      }
+
+      expect(find.text('Langkah ${titles.length} dari ${titles.length}'), findsOneWidget);
+      expect(find.text('Mulai Sekarang'), findsOneWidget);
+      expect(find.text('Lanjut'), findsNothing);
+    });
+
     testWidgets('langkah terakhir memakai tombol Mulai Sekarang',
         (tester) async {
       await tester.pumpWidget(
@@ -70,12 +101,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      for (var i = 0; i < 4; i++) {
+      for (var i = 0; i < 7; i++) {
         await tester.tap(find.text('Lanjut'));
         await tester.pumpAndSettle();
       }
 
-      expect(find.text('Notifikasi, Chat, dan Pengumpulan'), findsOneWidget);
+      expect(find.text('Cari Bantuan'), findsOneWidget);
       expect(find.text('Mulai Sekarang'), findsOneWidget);
       expect(find.text('Lanjut'), findsNothing);
     });

@@ -68,12 +68,17 @@ class AdminShell extends ConsumerWidget {
     final current = _current(path);
     final user = ref.watch(currentUserProvider).valueOrNull;
 
+    // Sub-halaman berikut sudah membawa AppBar sendiri; AppBar shell
+    // disembunyikan agar tidak muncul dua bilah judul sekaligus.
+    const selfChromeRoutes = {'/admin/riwayat-kode', '/admin/bantuan', '/admin/sesi'};
+    final childHasOwnAppBar = selfChromeRoutes.contains(path);
+
     final bottomRoutes = ['/admin', '/admin/siswa', '/admin/tugas', '/admin/laporan'];
     var bottomIndex = bottomRoutes.indexOf(current.route);
     if (bottomIndex < 0) bottomIndex = 0;
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: childHasOwnAppBar ? null : AppBar(
         title: Text(current.label),
         actions: [
           IconButton(
