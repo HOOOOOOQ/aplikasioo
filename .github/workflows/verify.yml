@@ -84,7 +84,7 @@ jobs:
             echo '### Tes yang gagal (ringkas)'
             echo
             echo '```'
-            grep -nE "\[E\]" -A 25 test.log | head -200 || true
+            grep -nE "\[E\]|Expected:|Actual:|Which:|TimeoutException|Failed to load|Some tests failed" -A 25 test.log | head -300 || true
             echo '```'
           } > test-fail.md
           cat test-fail.md >> "$GITHUB_STEP_SUMMARY"

@@ -245,7 +245,8 @@ void main() {
       }
       // Nilai statistik yang dipakai ringkasan PDF berasal dari baris yang sama.
       expect(csv, contains('Struktur Data'));
-      expect(csv, contains('40.0%'));
+      expect(csv, contains('66.7%')); // 20 dari 30 siswa
+      expect(csv, contains('50.0%')); // 15 dari 30 siswa
       expect(csv, contains('"')); // tanggal "08 Jan 2026, 10:00" dikutip
     });
 
